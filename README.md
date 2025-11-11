@@ -1,6 +1,6 @@
 # EventSphere
 
-EventSphere is a Campus Event Management is a microservice-based event management platform that can now be developed and run entirely with local tooling. The repository contains the backend services, a React frontend, and shared application code.
+EventSphere is a microservice-based event management platform. The repository contains the backend services, a React frontend, and shared application code.
 <img width="2557" height="1266" alt="image" src="https://github.com/user-attachments/assets/2879f378-bc57-4968-a198-7bd4bf08bcbf" />
 
 
@@ -25,7 +25,7 @@ All services communicate over HTTP and store data in MongoDB. Ensure that a Mong
 
 ## Project Structure
 ```
-campus-event-management/
+EventSphere/
 ├── frontend/
 ├── services/
 │   ├── auth-service/
