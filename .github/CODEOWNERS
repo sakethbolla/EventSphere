@@ -1,0 +1,31 @@
+# Code owners for EventSphere project
+
+# Infrastructure
+/infrastructure/ @team-devops
+/k8s/ @team-devops
+
+# Backend Services
+/services/auth-service/ @team-backend
+/services/event-service/ @team-backend
+/services/booking-service/ @team-backend
+/services/notification-service/ @team-backend
+
+# Frontend
+/frontend/ @team-frontend
+
+# CI/CD
+/.github/workflows/ @team-devops
+
+# Documentation
+*.md @team-leads
+
+# Security
+/k8s/security/ @team-security @team-devops
+/infrastructure/ @team-security @team-devops
+
+# Monitoring
+/monitoring/ @team-monitoring @team-devops
+
+
+
+
