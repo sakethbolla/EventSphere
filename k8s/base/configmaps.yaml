@@ -1,0 +1,60 @@
+# ConfigMaps for all services
+# These will be overridden by environment-specific overlays
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-service-config
+  namespace: prod
+data:
+  PORT: "4001"
+  NODE_ENV: "production"
+  AUTH_SERVICE_URL: "http://auth-service:4001"
+  CORS_ORIGINS: "http://localhost:3000,https://www.enpm818rgroup7.work.gd,https://enpm818rgroup7.work.gd"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: event-service-config
+  namespace: prod
+data:
+  PORT: "4002"
+  NODE_ENV: "production"
+  AUTH_SERVICE_URL: "http://auth-service.prod.svc.cluster.local:4001"
+  EVENT_SERVICE_URL: "http://event-service:4002"
+  CORS_ORIGINS: "http://localhost:3000,https://www.enpm818rgroup7.work.gd,https://enpm818rgroup7.work.gd"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: booking-service-config
+  namespace: prod
+data:
+  PORT: "4003"
+  NODE_ENV: "production"
+  AUTH_SERVICE_URL: "http://auth-service.prod.svc.cluster.local:4001"
+  EVENT_SERVICE_URL: "http://event-service.prod.svc.cluster.local:4002"
+  BOOKING_SERVICE_URL: "http://booking-service:4003"
+  CORS_ORIGINS: "http://localhost:3000,https://www.enpm818rgroup7.work.gd,https://enpm818rgroup7.work.gd"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: prod
+data:
+  REACT_APP_AUTH_API_URL: "https://api.enpm818rgroup7.work.gd/api"
+  REACT_APP_EVENT_API_URL: "https://api.enpm818rgroup7.work.gd/api"
+  REACT_APP_BOOKING_API_URL: "https://api.enpm818rgroup7.work.gd/api"
+  REACT_APP_NOTIFICATION_API_URL: "https://api.enpm818rgroup7.work.gd/api"
+  config.json: |
+    {
+      "auth": "https://api.enpm818rgroup7.work.gd/api",
+      "event": "https://api.enpm818rgroup7.work.gd/api",
+      "booking": "https://api.enpm818rgroup7.work.gd/api"
+    }
+
+
+
+

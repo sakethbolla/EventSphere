@@ -1,0 +1,712 @@
+# ==============================================================================
+# RBAC Configuration for EventSphere
+# ==============================================================================
+# This file contains:
+# 1. Service Accounts for all microservices (dev, staging, prod)
+# 2. Service-specific Roles with least-privilege access
+# 3. User Roles (Developer, Operator, Admin) for environment access
+# 4. RoleBindings to connect users/service accounts to roles
+# ==============================================================================
+
+# ==============================================================================
+# SERVICE ACCOUNTS - Production Namespace
+# ==============================================================================
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: auth-service-sa
+  namespace: prod
+  labels:
+    app: auth-service
+    environment: production
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: event-service-sa
+  namespace: prod
+  labels:
+    app: event-service
+    environment: production
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: booking-service-sa
+  namespace: prod
+  labels:
+    app: booking-service
+    environment: production
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: frontend-sa
+  namespace: prod
+  labels:
+    app: frontend
+    environment: production
+
+# ==============================================================================
+# SERVICE ACCOUNTS - Staging Namespace
+# ==============================================================================
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: auth-service-sa
+  namespace: staging
+  labels:
+    app: auth-service
+    environment: staging
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: event-service-sa
+  namespace: staging
+  labels:
+    app: event-service
+    environment: staging
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: booking-service-sa
+  namespace: staging
+  labels:
+    app: booking-service
+    environment: staging
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: frontend-sa
+  namespace: staging
+  labels:
+    app: frontend
+    environment: staging
+
+# ==============================================================================
+# SERVICE ACCOUNTS - Development Namespace
+# ==============================================================================
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: auth-service-sa
+  namespace: dev
+  labels:
+    app: auth-service
+    environment: development
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: event-service-sa
+  namespace: dev
+  labels:
+    app: event-service
+    environment: development
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: booking-service-sa
+  namespace: dev
+  labels:
+    app: booking-service
+    environment: development
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: frontend-sa
+  namespace: dev
+  labels:
+    app: frontend
+    environment: development
+
+# ==============================================================================
+# SERVICE-SPECIFIC ROLES - Production
+# ==============================================================================
+# These roles grant minimal permissions needed by each service to function
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: auth-service-role
+  namespace: prod
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list"]
+  resourceNames: ["mongodb-secret", "jwt-secret"]  # Limit to specific secrets
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: event-service-role
+  namespace: prod
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list"]
+  resourceNames: ["mongodb-secret"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: booking-service-role
+  namespace: prod
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list"]
+  resourceNames: ["mongodb-secret"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: frontend-role
+  namespace: prod
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]
+
+# ==============================================================================
+# SERVICE-SPECIFIC ROLES - Staging
+# ==============================================================================
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: auth-service-role
+  namespace: staging
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: event-service-role
+  namespace: staging
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: booking-service-role
+  namespace: staging
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: frontend-role
+  namespace: staging
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]
+
+# ==============================================================================
+# SERVICE-SPECIFIC ROLES - Development
+# ==============================================================================
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: auth-service-role
+  namespace: dev
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: event-service-role
+  namespace: dev
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: booking-service-role
+  namespace: dev
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: frontend-role
+  namespace: dev
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]
+
+# ==============================================================================
+# SERVICE ACCOUNT TO ROLE BINDINGS - Production
+# ==============================================================================
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: auth-service-rolebinding
+  namespace: prod
+subjects:
+- kind: ServiceAccount
+  name: auth-service-sa
+  namespace: prod
+roleRef:
+  kind: Role
+  name: auth-service-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: event-service-rolebinding
+  namespace: prod
+subjects:
+- kind: ServiceAccount
+  name: event-service-sa
+  namespace: prod
+roleRef:
+  kind: Role
+  name: event-service-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: booking-service-rolebinding
+  namespace: prod
+subjects:
+- kind: ServiceAccount
+  name: booking-service-sa
+  namespace: prod
+roleRef:
+  kind: Role
+  name: booking-service-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: frontend-rolebinding
+  namespace: prod
+subjects:
+- kind: ServiceAccount
+  name: frontend-sa
+  namespace: prod
+roleRef:
+  kind: Role
+  name: frontend-role
+  apiGroup: rbac.authorization.k8s.io
+
+# ==============================================================================
+# SERVICE ACCOUNT TO ROLE BINDINGS - Staging
+# ==============================================================================
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: auth-service-rolebinding
+  namespace: staging
+subjects:
+- kind: ServiceAccount
+  name: auth-service-sa
+  namespace: staging
+roleRef:
+  kind: Role
+  name: auth-service-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: event-service-rolebinding
+  namespace: staging
+subjects:
+- kind: ServiceAccount
+  name: event-service-sa
+  namespace: staging
+roleRef:
+  kind: Role
+  name: event-service-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: booking-service-rolebinding
+  namespace: staging
+subjects:
+- kind: ServiceAccount
+  name: booking-service-sa
+  namespace: staging
+roleRef:
+  kind: Role
+  name: booking-service-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: frontend-rolebinding
+  namespace: staging
+subjects:
+- kind: ServiceAccount
+  name: frontend-sa
+  namespace: staging
+roleRef:
+  kind: Role
+  name: frontend-role
+  apiGroup: rbac.authorization.k8s.io
+
+# ==============================================================================
+# SERVICE ACCOUNT TO ROLE BINDINGS - Development
+# ==============================================================================
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: auth-service-rolebinding
+  namespace: dev
+subjects:
+- kind: ServiceAccount
+  name: auth-service-sa
+  namespace: dev
+roleRef:
+  kind: Role
+  name: auth-service-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: event-service-rolebinding
+  namespace: dev
+subjects:
+- kind: ServiceAccount
+  name: event-service-sa
+  namespace: dev
+roleRef:
+  kind: Role
+  name: event-service-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: booking-service-rolebinding
+  namespace: dev
+subjects:
+- kind: ServiceAccount
+  name: booking-service-sa
+  namespace: dev
+roleRef:
+  kind: Role
+  name: booking-service-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: frontend-rolebinding
+  namespace: dev
+subjects:
+- kind: ServiceAccount
+  name: frontend-sa
+  namespace: dev
+roleRef:
+  kind: Role
+  name: frontend-role
+  apiGroup: rbac.authorization.k8s.io
+
+# ==============================================================================
+# USER ROLES - ClusterRoles for cross-namespace access
+# ==============================================================================
+# These roles are for human users/teams to access the cluster
+---
+# Developer Role: Edit access to dev/staging, read-only to prod
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: eventsphere-developer
+  labels:
+    rbac.eventsphere.io/role: developer
+rules:
+# View nodes and namespaces
+- apiGroups: [""]
+  resources: ["nodes", "namespaces"]
+  verbs: ["get", "list"]
+# View cluster-wide resources
+- apiGroups: [""]
+  resources: ["persistentvolumes"]
+  verbs: ["get", "list"]
+---
+# Operator Role: Admin access to dev/staging/prod, limited cluster access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: eventsphere-operator
+  labels:
+    rbac.eventsphere.io/role: operator
+rules:
+# View and manage nodes
+- apiGroups: [""]
+  resources: ["nodes", "namespaces"]
+  verbs: ["get", "list", "watch"]
+# View cluster resources
+- apiGroups: [""]
+  resources: ["persistentvolumes", "storageclasses"]
+  verbs: ["get", "list", "watch"]
+# View monitoring resources
+- apiGroups: [""]
+  resources: ["componentstatuses"]
+  verbs: ["get", "list"]
+---
+# Admin Role: Full cluster access (use sparingly)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: eventsphere-admin
+  labels:
+    rbac.eventsphere.io/role: admin
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+
+# ==============================================================================
+# NAMESPACE-SPECIFIC ROLES FOR USERS
+# ==============================================================================
+# Developer role in dev namespace - Full edit access
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: developer-full-access
+  namespace: dev
+rules:
+- apiGroups: ["", "apps", "batch", "extensions", "networking.k8s.io", "autoscaling"]
+  resources: ["*"]
+  verbs: ["*"]
+# Can't delete namespace itself
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list"]
+---
+# Developer role in staging namespace - Full edit access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: developer-full-access
+  namespace: staging
+rules:
+- apiGroups: ["", "apps", "batch", "extensions", "networking.k8s.io", "autoscaling"]
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list"]
+---
+# Developer role in prod namespace - Read-only access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: developer-read-only
+  namespace: prod
+rules:
+- apiGroups: ["", "apps", "batch", "extensions", "networking.k8s.io", "autoscaling"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods/log", "pods/status"]
+  verbs: ["get", "list"]
+---
+# Operator role in all namespaces - Full edit access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: operator-full-access
+  namespace: dev
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: operator-full-access
+  namespace: staging
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: operator-full-access
+  namespace: prod
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+
+# ==============================================================================
+# EXAMPLE USER ROLEBINDINGS
+# ==============================================================================
+# Uncomment and customize these for your actual users/groups
+# Replace <USER_EMAIL> with actual AWS IAM user ARN or OIDC group
+# ==============================================================================
+
+# Example: Bind developer role to a user/group
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: developer-jane-doe
+# subjects:
+# - kind: User
+#   name: jane.doe@example.com  # Or AWS IAM ARN
+#   apiGroup: rbac.authorization.k8s.io
+# roleRef:
+#   kind: ClusterRole
+#   name: eventsphere-developer
+#   apiGroup: rbac.authorization.k8s.io
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: developer-jane-doe-dev
+#   namespace: dev
+# subjects:
+# - kind: User
+#   name: jane.doe@example.com
+#   apiGroup: rbac.authorization.k8s.io
+# roleRef:
+#   kind: Role
+#   name: developer-full-access
+#   apiGroup: rbac.authorization.k8s.io
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: developer-jane-doe-staging
+#   namespace: staging
+# subjects:
+# - kind: User
+#   name: jane.doe@example.com
+#   apiGroup: rbac.authorization.k8s.io
+# roleRef:
+#   kind: Role
+#   name: developer-full-access
+#   apiGroup: rbac.authorization.k8s.io
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: developer-jane-doe-prod
+#   namespace: prod
+# subjects:
+# - kind: User
+#   name: jane.doe@example.com
+#   apiGroup: rbac.authorization.k8s.io
+# roleRef:
+#   kind: Role
+#   name: developer-read-only
+#   apiGroup: rbac.authorization.k8s.io
+
+# Example: Bind operator role to a user/group
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: operator-john-smith
+# subjects:
+# - kind: User
+#   name: john.smith@example.com
+#   apiGroup: rbac.authorization.k8s.io
+# roleRef:
+#   kind: ClusterRole
+#   name: eventsphere-operator
+#   apiGroup: rbac.authorization.k8s.io
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: operator-john-smith-dev
+#   namespace: dev
+# subjects:
+# - kind: User
+#   name: john.smith@example.com
+#   apiGroup: rbac.authorization.k8s.io
+# roleRef:
+#   kind: Role
+#   name: operator-full-access
+#   apiGroup: rbac.authorization.k8s.io
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: operator-john-smith-staging
+#   namespace: staging
+# subjects:
+# - kind: User
+#   name: john.smith@example.com
+#   apiGroup: rbac.authorization.k8s.io
+# roleRef:
+#   kind: Role
+#   name: operator-full-access
+#   apiGroup: rbac.authorization.k8s.io
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: operator-john-smith-prod
+#   namespace: prod
+# subjects:
+# - kind: User
+#   name: john.smith@example.com
+#   apiGroup: rbac.authorization.k8s.io
+# roleRef:
+#   kind: Role
+#   name: operator-full-access
+#   apiGroup: rbac.authorization.k8s.io
+
+
+
+

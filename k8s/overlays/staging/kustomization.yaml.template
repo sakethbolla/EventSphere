@@ -1,0 +1,43 @@
+# Kustomize overlay for staging environment
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: staging
+
+resources:
+  - ../../base
+
+replicas:
+  - name: auth-service
+    count: 2
+  - name: event-service
+    count: 2
+  - name: booking-service
+    count: 2
+  - name: frontend
+    count: 2
+
+images:
+  - name: ${ECR_REGISTRY}/auth-service
+    newTag: staging
+  - name: ${ECR_REGISTRY}/event-service
+    newTag: staging
+  - name: ${ECR_REGISTRY}/booking-service
+    newTag: staging
+  - name: ${ECR_REGISTRY}/frontend
+    newTag: staging
+
+configMapGenerator:
+  - name: auth-service-config
+    behavior: merge
+    literals:
+      - NODE_ENV=staging
+  - name: event-service-config
+    behavior: merge
+    literals:
+      - NODE_ENV=staging
+  - name: booking-service-config
+    behavior: merge
+    literals:
+      - NODE_ENV=staging
+

@@ -26,11 +26,27 @@ All services communicate over HTTP and store data in MongoDB. Ensure that a Mong
 ## Project Structure
 ```
 EventSphere/
-├── frontend/
-├── services/
+├── frontend/                    # React frontend application
+├── services/                    # Microservices
 │   ├── auth-service/
-│   ├── booking-service/
-│   └── event-service/
+│   ├── event-service/
+│   └── booking-service/
+├── k8s/                         # Kubernetes manifests
+│   ├── base/                    # Base configurations
+│   ├── mongodb/                 # MongoDB StatefulSet
+│   ├── ingress/                 # ALB Ingress config
+│   ├── security/                # Security policies
+│   ├── hpa/                     # Horizontal Pod Autoscaling
+│   └── overlays/                # Environment-specific configs
+├── infrastructure/              # Infrastructure as Code
+│   ├── eksctl-cluster.yaml      # EKS cluster config
+│   └── scripts/                 # Setup/teardown scripts
+├── monitoring/                  # Observability configs
+│   ├── prometheus/              # Prometheus setup
+│   ├── grafana/                 # Grafana dashboards
+│   └── cloudwatch/              # CloudWatch logging
+├── .github/                     # CI/CD workflows
+│   └── workflows/               # GitHub Actions
 └── README.md
 ```
 
@@ -111,3 +127,53 @@ Each service directory and the frontend already include a committed `.env` file 
 - `AUTH_SERVICE_URL` / `EVENT_SERVICE_URL` – internal service discovery URLs
 
 The frontend `.env` exposes `REACT_APP_AUTH_API_URL`, `REACT_APP_EVENT_API_URL`, and `REACT_APP_BOOKING_API_URL`. Adjust these if your backend runs on different hosts or ports.
+
+## Testing
+Each service currently includes placeholder npm test scripts. Extend these as needed and run them with `npm test` from the respective service directory.
+
+## Cloud Deployment (AWS EKS)
+
+EventSphere is designed for production deployment on AWS EKS with full observability, security, and CI/CD integration.
+
+### Quick Start - EKS Deployment
+
+1. **Prerequisites**: AWS CLI, eksctl, kubectl, helm
+2. **Create Cluster**: See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions
+   ```bash
+   cd infrastructure/scripts
+   ./setup-eks.sh
+   ```
+3. **Deploy Services**: Follow the deployment guide in [DEPLOYMENT.md](DEPLOYMENT.md)
+
+### Key Features
+
+- **Infrastructure**: EKS cluster with 3+ nodes across 2+ availability zones
+- **Load Balancing**: AWS ALB with HTTPS/TLS termination
+- **Auto-scaling**: HPA for pods, Cluster Autoscaler for nodes
+- **Monitoring**: Prometheus, Grafana, and CloudWatch integration
+- **Security**: GuardDuty, Security Hub, Network Policies, Pod Security Standards
+- **CI/CD**: GitHub Actions for automated builds and deployments
+- **Secrets Management**: External Secrets Operator with AWS Secrets Manager
+
+### Documentation
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: System architecture and design
+- **[DEPLOYMENT.md](DEPLOYMENT.md)**: Step-by-step deployment guide
+- **[SECURITY.md](SECURITY.md)**: Security measures and compliance
+- **[CONTRIBUTING.md](CONTRIBUTING.md)**: Contribution guidelines
+
+### Operational Runbooks
+
+Comprehensive runbooks for operational procedures:
+
+- **[Backup and Restore](docs/runbooks/BACKUP_RESTORE.md)**: Velero and manual EBS backup/restore procedures
+- **[Disaster Recovery](docs/runbooks/DISASTER_RECOVERY.md)**: Complete cluster recovery procedures
+- **[Security Incident Response](docs/runbooks/SECURITY_INCIDENT_RESPONSE.md)**: Incident classification and response
+- **[Deployment and Rollback](docs/runbooks/DEPLOYMENT_ROLLBACK.md)**: Deployment strategies and rollback procedures
+- **[Troubleshooting](docs/runbooks/TROUBLESHOOTING.md)**: Common issues and diagnostic procedures
+- **[Maintenance](docs/runbooks/MAINTENANCE.md)**: Regular maintenance tasks and schedules
+- **[Alert Handling](monitoring/alertmanager/runbook.md)**: Prometheus alert response procedures
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. For security issues, please email security@enpm818rgroup7.work.gd instead of creating a public issue.

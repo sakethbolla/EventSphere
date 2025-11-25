@@ -11,12 +11,29 @@ const PORT = process.env.PORT || 4002;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/eventsphere-events';
 
 // Middleware
+// CORS configuration - allow production and development origins
+const allowedOrigins = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(',')
+  : [
+      'http://localhost:3000',
+      'https://www.enpm818rgroup7.work.gd',
+      'https://enpm818rgroup7.work.gd',
+      'https://wonderful-water-07646600f.3.azurestaticapps.net',
+      'https://wonderful-water-07646600f-preview.eastus2.3.azurestaticapps.net'
+    ];
+
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://wonderful-water-07646600f.3.azurestaticapps.net',
-    'https://wonderful-water-07646600f-preview.eastus2.3.azurestaticapps.net'
-  ],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS: Blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());

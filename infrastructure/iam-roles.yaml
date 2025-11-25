@@ -1,0 +1,181 @@
+# IAM Roles and Policies for EventSphere EKS Cluster
+# These roles are created via eksctl using IRSA (IAM Roles for Service Accounts)
+# The OIDC provider is automatically created when withOIDC: true is set in eksctl-cluster.yaml
+#
+# To create these roles manually, use the create-iam-roles.sh script or AWS CLI commands below
+
+# ==============================================================================
+# Node Group IAM Role Policies (Created automatically by eksctl)
+# ==============================================================================
+# These policies are attached to node group IAM roles:
+# - AmazonEKSWorkerNodePolicy: Allows nodes to connect to EKS cluster
+# - AmazonEKS_CNI_Policy: Allows nodes to manage ENIs for pod networking
+# - AmazonEC2ContainerRegistryReadOnly: Allows nodes to pull images from ECR
+# - CloudWatchAgentServerPolicy: Allows nodes to send logs to CloudWatch
+
+# ==============================================================================
+# Service Account IAM Roles (IRSA) - Created via eksctl or manually
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Fluent Bit Role - CloudWatch Logs Access
+# ------------------------------------------------------------------------------
+# Service Account: fluent-bit (namespace: kube-system)
+# Purpose: Allows Fluent Bit to send logs to CloudWatch Logs
+#
+# Permissions Policy:
+# - CloudWatchAgentServerPolicy (AWS managed policy)
+
+# AWS CLI command to create:
+# aws iam create-role \
+#   --role-name fluent-bit-role \
+#   --assume-role-policy-document file://trust-policy-fluent-bit.json \
+#   --tags Key=Project,Value=EventSphere Key=Service,Value=fluent-bit
+
+# Attach policy:
+# aws iam attach-role-policy \
+#   --role-name fluent-bit-role \
+#   --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+
+# ------------------------------------------------------------------------------
+# 2. External Secrets Operator Role - Secrets Manager Access
+# ------------------------------------------------------------------------------
+# Service Account: external-secrets (namespace: external-secrets-system)
+# Purpose: Allows External Secrets Operator to read secrets from AWS Secrets Manager
+#
+# Trust Policy: Similar to above but for external-secrets-system:external-secrets
+#
+# Permissions Policy:
+# - SecretsManagerReadWrite (or custom policy with least privilege)
+
+# AWS CLI command to create:
+# aws iam create-role \
+#   --role-name external-secrets-role \
+#   --assume-role-policy-document file://trust-policy-external-secrets.json \
+#   --tags Key=Project,Value=EventSphere Key=Service,Value=external-secrets
+
+# Custom Policy (Least Privilege):
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [
+#     {
+#       "Effect": "Allow",
+#       "Action": [
+#         "secretsmanager:GetSecretValue",
+#         "secretsmanager:DescribeSecret"
+#       ],
+#       "Resource": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:eventsphere/*"
+#     },
+#     {
+#       "Effect": "Allow",
+#       "Action": [
+#         "secretsmanager:ListSecrets"
+#       ],
+#       "Resource": "*"
+#     }
+#   ]
+# }
+
+# ------------------------------------------------------------------------------
+# 3. AWS Load Balancer Controller Role
+# ------------------------------------------------------------------------------
+# Service Account: aws-load-balancer-controller (namespace: kube-system)
+# Purpose: Manages ALB/NLB resources for Ingress
+#
+# Note: This role is typically created automatically by eksctl when using
+# wellKnownPolicies: awsLoadBalancerController: true
+#
+# Permissions Policy:
+# - AWS managed policy: AWSLoadBalancerControllerIAMPolicy
+
+# ------------------------------------------------------------------------------
+# 4. Cluster Autoscaler Role
+# ------------------------------------------------------------------------------
+# Service Account: cluster-autoscaler (namespace: kube-system)
+# Purpose: Manages EC2 Auto Scaling Groups for node scaling
+#
+# Note: This role is typically created automatically by eksctl when using
+# wellKnownPolicies: autoScaler: true
+#
+# Permissions Policy:
+# - AWS managed policy: ClusterAutoscalerPolicy
+
+# ------------------------------------------------------------------------------
+# 5. EBS CSI Driver Role
+# ------------------------------------------------------------------------------
+# Service Account: ebs-csi-controller-sa (namespace: kube-system)
+# Purpose: Manages EBS volumes for persistent storage
+#
+# Note: This role is typically created automatically by eksctl when using
+# wellKnownPolicies: ebsCSIController: true
+#
+# Permissions Policy:
+# - AWS managed policy: service-role/AmazonEBSCSIDriverPolicy
+
+# ------------------------------------------------------------------------------
+# 6. EFS CSI Driver Role
+# ------------------------------------------------------------------------------
+# Service Account: efs-csi-controller-sa (namespace: kube-system)
+# Purpose: Manages EFS file systems for shared storage
+#
+# Note: This role is typically created automatically by eksctl when using
+# wellKnownPolicies: efsCSIController: true
+#
+# Permissions Policy:
+# - AWS managed policy: service-role/AmazonEFSCSIDriverPolicy
+
+# ==============================================================================
+# Getting OIDC Provider ID
+# ==============================================================================
+# To get the OIDC provider ID for trust policies:
+# aws eks describe-cluster --name eventsphere-cluster --region us-east-1 \
+#   --query "cluster.identity.oidc.issuer" --output text | cut -d '/' -f 5
+#
+# Or use eksctl:
+# eksctl utils associate-iam-oidc-provider --cluster eventsphere-cluster --region us-east-1 --approve
+
+# ==============================================================================
+# Trust Policy Template
+# ==============================================================================
+# Replace <ACCOUNT_ID>, <REGION>, <OIDC_ID>, <NAMESPACE>, and <SERVICE_ACCOUNT>
+# in the following template:
+#
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [
+#     {
+#       "Effect": "Allow",
+#       "Principal": {
+#         "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>"
+#       },
+#       "Action": "sts:AssumeRoleWithWebIdentity",
+#       "Condition": {
+#         "StringEquals": {
+#           "oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>:sub": "system:serviceaccount:<NAMESPACE>:<SERVICE_ACCOUNT>",
+#           "oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>:aud": "sts.amazonaws.com"
+#         }
+#       }
+#     }
+#   ]
+# }
+
+# ==============================================================================
+# Manual Role Creation Steps
+# ==============================================================================
+# 1. Get OIDC provider ID:
+#    OIDC_ID=$(aws eks describe-cluster --name eventsphere-cluster --region us-east-1 \
+#      --query "cluster.identity.oidc.issuer" --output text | cut -d '/' -f 5)
+#
+# 2. Create trust policy file with correct OIDC_ID, namespace, and service account
+#
+# 3. Create IAM role:
+#    aws iam create-role --role-name <role-name> --assume-role-policy-document file://trust-policy.json
+#
+# 4. Attach permissions policy:
+#    aws iam attach-role-policy --role-name <role-name> --policy-arn <policy-arn>
+#
+# 5. Update service account annotation in Kubernetes:
+#    kubectl annotate serviceaccount <sa-name> -n <namespace> \
+#      eks.amazonaws.com/role-arn=arn:aws:iam::<ACCOUNT_ID>:role/<role-name>
+#
+# Or use the create-iam-roles.sh script for automated creation.

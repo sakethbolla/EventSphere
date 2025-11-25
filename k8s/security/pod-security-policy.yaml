@@ -1,0 +1,14 @@
+# Pod Security Standards - Restricted baseline
+# This enforces the restricted pod security standard for the prod namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+
+
+

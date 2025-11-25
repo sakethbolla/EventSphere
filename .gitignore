@@ -14,3 +14,13 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Generated Kubernetes manifests
+k8s/generated/
+monitoring/cloudwatch/generated/
+
+# Configuration files (keep example files)
+infrastructure/config/config.env
+*.env
+!.env.example
+!infrastructure/config/config.env.example
