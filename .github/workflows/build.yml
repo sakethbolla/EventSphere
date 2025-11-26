@@ -8,9 +8,6 @@ on:
   pull_request:
     branches:
       - main
-    paths-ignore:
-      - '*.md'
-      - '**/*.md'
   workflow_dispatch:
     inputs:
       image_tag:
