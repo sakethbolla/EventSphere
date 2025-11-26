@@ -1,5 +1,5 @@
 # Multi-stage build for optimized production image
-FROM node:18-alpine3.19 AS build
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ COPY . .
 RUN npm run build
 
 # Production stage with Nginx
-FROM nginx:1.27-alpine AS production
+FROM nginx:alpine AS production
 
 # Create non-root user (nginx user already exists in nginx:alpine)
 # nginx:alpine runs as nginx user by default, but we'll ensure proper permissions
