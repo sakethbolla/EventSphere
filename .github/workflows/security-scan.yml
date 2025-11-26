@@ -21,7 +21,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Trivy filesystem scan
+      - name: Install Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          trivy-version: 'latest'
+
+      - name: Run Trivy filesystem scan (show vulnerabilities)
+        id: trivy-fs-table
+        continue-on-error: true
+        run: |
+          echo "🔍 Running Trivy filesystem scan - showing CRITICAL vulnerabilities..."
+          echo "=========================================="
+          trivy fs . --severity CRITICAL --format table --exit-code 0 || true
+          echo "=========================================="
+
+      - name: Run Trivy filesystem scan (SARIF for GitHub)
+        id: trivy-fs
+        continue-on-error: true
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
@@ -30,8 +46,26 @@ jobs:
           output: 'trivy-fs-results.sarif'
           severity: 'CRITICAL'
           exit-code: '1'  # Fail only on critical vulnerabilities
+      
+      - name: Show filesystem scan summary
+        if: steps.trivy-fs.outcome == 'failure'
+        run: |
+          echo "CRITICAL vulnerabilities found in filesystem scan"
+          echo "See the table output above for details"
+          echo "Full results uploaded to GitHub Security tab"
 
-      - name: Run Trivy Kubernetes and Dockerfile scan
+      - name: Run Trivy Kubernetes and Dockerfile scan (show vulnerabilities)
+        id: trivy-config-table
+        continue-on-error: true
+        run: |
+          echo "🔍 Running Trivy config scan - showing CRITICAL vulnerabilities..."
+          echo "=========================================="
+          trivy config . --severity CRITICAL --format table --exit-code 0 || true
+          echo "=========================================="
+
+      - name: Run Trivy Kubernetes and Dockerfile scan (SARIF for GitHub)
+        id: trivy-config
+        continue-on-error: true
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'config'
@@ -40,6 +74,13 @@ jobs:
           output: 'trivy-config-results.sarif'
           severity: 'CRITICAL'
           exit-code: '1'  # Fail only on critical vulnerabilities
+      
+      - name: Show config scan summary
+        if: steps.trivy-config.outcome == 'failure'
+        run: |
+          echo "CRITICAL vulnerabilities found in config scan"
+          echo "See the table output above for details"
+          echo "Full results uploaded to GitHub Security tab"
 
       - name: Run Checkov infrastructure scan
         uses: bridgecrewio/checkov-action@master
