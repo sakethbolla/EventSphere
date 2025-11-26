@@ -30,8 +30,8 @@ on:
         default: false
 
 env:
-  AWS_REGION: us-east-1
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
 
 jobs:
   build-and-push:
@@ -39,21 +39,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
       id-token: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set image tag
         id: set-tag
@@ -68,21 +59,12 @@ jobs:
             echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create ECR repositories if needed
-        run: |
-          SERVICES=("auth-service" "event-service" "booking-service" "frontend")
-          for service in "${SERVICES[@]}"; do
-            if ! aws ecr describe-repositories --repository-names "$service" --region "${{ env.AWS_REGION }}" &> /dev/null; then
-              echo "Creating ECR repository: $service"
-              aws ecr create-repository \
-                --repository-name "$service" \
-                --region "${{ env.AWS_REGION }}" \
-                --image-scanning-configuration scanOnPush=true \
-                --encryption-configuration encryptionType=AES256
-            else
-              echo "Repository $service already exists"
-            fi
-          done
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -94,8 +76,8 @@ jobs:
           file: ./services/auth-service/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.ECR_REGISTRY }}/auth-service:${{ steps.set-tag.outputs.tag }}
-            ${{ env.ECR_REGISTRY }}/auth-service:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/auth-service:${{ steps.set-tag.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/auth-service:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
@@ -107,8 +89,8 @@ jobs:
           file: ./services/event-service/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.ECR_REGISTRY }}/event-service:${{ steps.set-tag.outputs.tag }}
-            ${{ env.ECR_REGISTRY }}/event-service:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/event-service:${{ steps.set-tag.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/event-service:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
@@ -120,8 +102,8 @@ jobs:
           file: ./services/booking-service/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.ECR_REGISTRY }}/booking-service:${{ steps.set-tag.outputs.tag }}
-            ${{ env.ECR_REGISTRY }}/booking-service:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/booking-service:${{ steps.set-tag.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/booking-service:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
@@ -133,8 +115,8 @@ jobs:
           file: ./frontend/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.ECR_REGISTRY }}/frontend:${{ steps.set-tag.outputs.tag }}
-            ${{ env.ECR_REGISTRY }}/frontend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${{ steps.set-tag.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
@@ -143,7 +125,7 @@ jobs:
         if: github.event_name != 'pull_request' && github.event.inputs.skip_scan != 'true'
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.ECR_REGISTRY }}/auth-service:${{ steps.set-tag.outputs.tag }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/auth-service:${{ steps.set-tag.outputs.tag }}
           format: 'sarif'
           output: 'trivy-auth-service.sarif'
           severity: 'CRITICAL,HIGH'
@@ -152,7 +134,7 @@ jobs:
         if: github.event_name != 'pull_request' && github.event.inputs.skip_scan != 'true'
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.ECR_REGISTRY }}/event-service:${{ steps.set-tag.outputs.tag }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/event-service:${{ steps.set-tag.outputs.tag }}
           format: 'sarif'
           output: 'trivy-event-service.sarif'
           severity: 'CRITICAL,HIGH'
@@ -161,7 +143,7 @@ jobs:
         if: github.event_name != 'pull_request' && github.event.inputs.skip_scan != 'true'
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.ECR_REGISTRY }}/booking-service:${{ steps.set-tag.outputs.tag }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/booking-service:${{ steps.set-tag.outputs.tag }}
           format: 'sarif'
           output: 'trivy-booking-service.sarif'
           severity: 'CRITICAL,HIGH'
@@ -170,7 +152,7 @@ jobs:
         if: github.event_name != 'pull_request' && github.event.inputs.skip_scan != 'true'
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.ECR_REGISTRY }}/frontend:${{ steps.set-tag.outputs.tag }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${{ steps.set-tag.outputs.tag }}
           format: 'sarif'
           output: 'trivy-frontend.sarif'
           severity: 'CRITICAL,HIGH'
@@ -190,8 +172,9 @@ jobs:
         run: |
           echo "Built and pushed images with tag: ${{ steps.set-tag.outputs.tag }}"
           echo "Images available at:"
-          echo "  - ${{ env.ECR_REGISTRY }}/auth-service:${{ steps.set-tag.outputs.tag }}"
-          echo "  - ${{ env.ECR_REGISTRY }}/event-service:${{ steps.set-tag.outputs.tag }}"
-          echo "  - ${{ env.ECR_REGISTRY }}/booking-service:${{ steps.set-tag.outputs.tag }}"
-          echo "  - ${{ env.ECR_REGISTRY }}/frontend:${{ steps.set-tag.outputs.tag }}"
-
+          echo "  - ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/auth-service:${{ steps.set-tag.outputs.tag }}"
+          echo "  - ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/event-service:${{ steps.set-tag.outputs.tag }}"
+          echo "  - ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/booking-service:${{ steps.set-tag.outputs.tag }}"
+          echo "  - ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${{ steps.set-tag.outputs.tag }}"
+          echo ""
+          echo "View packages at: https://github.com/${{ github.repository }}/pkgs/container"
