@@ -1,13 +1,22 @@
 name: Build and Push Docker Images
 
 on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
   workflow_run:
     workflows: ["Security Scan"]
     types:
       - completed
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       image_tag:
