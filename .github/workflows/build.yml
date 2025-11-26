@@ -36,11 +36,12 @@ jobs:
   build-and-push:
     name: Build and Push Images
     runs-on: ubuntu-latest
-    # Run if security scan passed (workflow_run), on PR, or if manually triggered
+    # Always run on PRs and manual dispatch (these show as PR checks)
+    # For workflow_run, only run if security scan succeeded
     if: |
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
       github.event_name == 'pull_request' ||
-      github.event_name == 'workflow_dispatch'
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     permissions:
       contents: read
       packages: write
