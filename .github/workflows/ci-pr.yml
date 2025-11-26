@@ -536,17 +536,96 @@ jobs:
         run: |
           kubectl create namespace dev --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Create mock secrets
+      - name: Create MongoDB secrets
         run: |
-          # Create mock MongoDB secret
+          # Create MongoDB secret with proper connection string
+          MONGODB_PASSWORD="test-mongodb-password"
+          MONGO_CONNECTION_STRING="mongodb://admin:${MONGODB_PASSWORD}@mongodb.dev.svc.cluster.local:27017/eventsphere?authSource=admin"
+          
           kubectl create secret generic mongodb-secret \
-            --from-literal=connection-string="mongodb://localhost:27017/eventsphere" \
+            --from-literal=username=admin \
+            --from-literal=password="${MONGODB_PASSWORD}" \
+            --from-literal=connection-string="${MONGO_CONNECTION_STRING}" \
             -n dev --dry-run=client -o yaml | kubectl apply -f -
           
-          # Create mock auth service secret
+          # Create auth service secret
           kubectl create secret generic auth-service-secret \
             --from-literal=jwt-secret="test-jwt-secret-key-for-kind-deployment" \
             -n dev --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy MongoDB for testing
+        run: |
+          # Create MongoDB service
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: mongodb
+            namespace: dev
+          spec:
+            type: ClusterIP
+            ports:
+            - port: 27017
+              targetPort: 27017
+            selector:
+              app: mongodb
+          EOF
+          
+          # Create MongoDB deployment (simplified for kind - no persistent storage)
+          kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: mongodb
+            namespace: dev
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: mongodb
+            template:
+              metadata:
+                labels:
+                  app: mongodb
+              spec:
+                containers:
+                - name: mongodb
+                  image: mongo:7.0
+                  ports:
+                  - containerPort: 27017
+                  env:
+                  - name: MONGO_INITDB_ROOT_USERNAME
+                    valueFrom:
+                      secretKeyRef:
+                        name: mongodb-secret
+                        key: username
+                  - name: MONGO_INITDB_ROOT_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: mongodb-secret
+                        key: password
+                  - name: MONGO_INITDB_DATABASE
+                    value: "eventsphere"
+                  resources:
+                    requests:
+                      memory: "256Mi"
+                      cpu: "250m"
+                    limits:
+                      memory: "512Mi"
+                      cpu: "500m"
+          EOF
+          
+          # Wait for MongoDB to be ready
+          echo "Waiting for MongoDB to be ready..."
+          kubectl wait --for=condition=available --timeout=120s \
+            deployment/mongodb -n dev || {
+            echo "MongoDB deployment not ready"
+            kubectl describe deployment mongodb -n dev
+            kubectl logs -n dev -l app=mongodb --tail=50
+            exit 1
+          }
+          
+          echo "MongoDB is ready"
 
       - name: Update namespace in generated manifests
         run: |
