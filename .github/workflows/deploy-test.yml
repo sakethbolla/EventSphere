@@ -5,6 +5,9 @@ on:
     workflows: ["Build and Push Docker Images"]
     types:
       - completed
+    branches: #TEST ONLY - Remove before merging to main
+      - main
+      - bhaile/cicd
   workflow_dispatch:
     inputs:
       image_tag:
