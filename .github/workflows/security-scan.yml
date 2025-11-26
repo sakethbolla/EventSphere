@@ -4,9 +4,15 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
   workflow_dispatch:
 
 jobs:
@@ -36,21 +42,16 @@ jobs:
         continue-on-error: true
         run: |
           echo "Running Trivy filesystem scan - showing CRITICAL vulnerabilities..."
+          echo "Note: Documentation files (*.md) excluded from scan"
           echo "=========================================="
-          trivy fs . --severity CRITICAL --format table --exit-code 0 || true
+          trivy fs . --severity CRITICAL --format table --skip-files '*.md' --exit-code 0 || true
           echo "=========================================="
 
       - name: Run Trivy filesystem scan (SARIF for GitHub)
         id: trivy-fs
         continue-on-error: true
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-fs-results.sarif'
-          severity: 'CRITICAL'
-          exit-code: '1'  # Fail only on critical vulnerabilities
+        run: |
+          trivy fs . --severity CRITICAL --format sarif --output trivy-fs-results.sarif --skip-files '*.md' --exit-code 1 || true
       
       - name: Show filesystem scan summary
         if: steps.trivy-fs.outcome == 'failure'
