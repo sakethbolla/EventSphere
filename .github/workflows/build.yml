@@ -5,9 +5,8 @@ on:
     workflows: ["Security Scan"]
     types:
       - completed
-    branches: #TEST ONLY - Remove before merging to main
-      - main 
-      - bhaile/cicd
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       image_tag:
@@ -27,10 +26,8 @@ jobs:
   build-and-push:
     name: Build and Push Images
     runs-on: ubuntu-latest
-    # Always run on PRs and manual dispatch (these show as PR checks)
-    # For workflow_run, only run if security scan succeeded
+    # Only run if security scan succeeded or manual dispatch
     if: |
-      github.event_name == 'pull_request' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     permissions:
@@ -42,7 +39,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || github.ref }}
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: Set lowercase image prefix
         id: image-prefix
@@ -54,15 +51,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            # Use commit SHA for PRs
-            echo "tag=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event.workflow_run.event }}" == "pull_request" ]; then
-            echo "tag=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event.workflow_run.head_branch }}" == "main" ]; then
-            # Use commit SHA for main branch (or can be changed to 'latest' if preferred)
-            echo "tag=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
           else
+            # Use commit SHA for workflow_run (matches security scan workflow)
             echo "tag=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
           fi
 
