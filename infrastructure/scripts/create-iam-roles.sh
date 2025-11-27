@@ -60,7 +60,7 @@ echo -e "${GREEN}✅ OIDC Provider ID: $OIDC_ID${NC}"
 create_trust_policy() {
     local namespace=$1
     local service_account=$2
-    local temp_file=$(mktemp)
+    local temp_file=$(mktemp ./"tmp.XXXXXXXXXX")
     
     cat > $temp_file <<EOF
 {
@@ -169,7 +169,7 @@ echo "2. External Secrets Operator Role"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Create custom policy for Secrets Manager (least privilege)
-SECRETS_POLICY_FILE=$(mktemp)
+SECRETS_POLICY_FILE=$(mktemp ./"tmp.XXXXXXXXXX")
 cat > $SECRETS_POLICY_FILE <<EOF
 {
   "Version": "2012-10-17",
@@ -215,7 +215,3 @@ echo "   kubectl describe sa external-secrets -n external-secrets-system"
 echo ""
 echo "Note: ALB Controller, Cluster Autoscaler, EBS CSI, and EFS CSI roles"
 echo "      are created automatically by eksctl when using wellKnownPolicies."
-
-
-
-
