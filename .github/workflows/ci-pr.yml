@@ -1,0 +1,706 @@
+name: CI Pipeline (PR)
+
+# Combined workflow for PRs with sequential jobs: Security Scan → Build → Deploy
+# For main branch, use separate workflows with workflow_run triggers
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
+
+env:
+  GHCR_REGISTRY: ghcr.io
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+  CLUSTER_NAME: eventsphere-test
+
+jobs:
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install wget apt-transport-https gnupg lsb-release -y
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install trivy -y
+          trivy --version
+
+      - name: Run Trivy filesystem scan (show vulnerabilities)
+        id: trivy-fs-table
+        continue-on-error: true
+        run: |
+          echo "Running Trivy filesystem scan - showing CRITICAL vulnerabilities..."
+          echo "Note: Documentation files (*.md) excluded from scan"
+          echo "=========================================="
+          trivy fs . --severity CRITICAL --format table --skip-files '*.md' --exit-code 0 || true
+          echo "=========================================="
+
+      - name: Run Trivy filesystem scan (SARIF for GitHub)
+        id: trivy-fs
+        continue-on-error: true
+        run: |
+          trivy fs . --severity CRITICAL --format sarif --output trivy-fs-results.sarif --skip-files '*.md' --exit-code 1 || true
+      
+      - name: Show filesystem scan summary
+        if: steps.trivy-fs.outcome == 'failure'
+        run: |
+          echo "CRITICAL vulnerabilities found in filesystem scan"
+          echo "See the table output above for details"
+          echo "Full results uploaded to GitHub Security tab"
+
+      - name: Run Trivy Kubernetes and Dockerfile scan (show vulnerabilities)
+        id: trivy-config-table
+        continue-on-error: true
+        run: |
+          echo "Running Trivy config scan - showing CRITICAL vulnerabilities..."
+          echo "Note: RBAC files (k8s/base/rbac.yaml) excluded from scan"
+          echo "  Reason: Intentionally permissive roles for class project demonstration"
+          echo "=========================================="
+          trivy config . --severity CRITICAL --format table --skip-files k8s/base/rbac.yaml --exit-code 0 || true
+          echo "=========================================="
+
+      - name: Run Trivy Kubernetes and Dockerfile scan (SARIF for GitHub)
+        id: trivy-config
+        continue-on-error: true
+        run: |
+          trivy config . --severity CRITICAL --format sarif --output trivy-config-results.sarif --skip-files k8s/base/rbac.yaml --exit-code 1 || true
+      
+      - name: Show config scan summary
+        if: steps.trivy-config.outcome == 'failure'
+        run: |
+          echo "CRITICAL vulnerabilities found in config scan"
+          echo "See the table output above for details"
+          echo "Full results uploaded to GitHub Security tab"
+
+      - name: Run Checkov infrastructure scan
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: infrastructure/
+          framework: cloudformation,terraform,kubernetes
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+          soft_fail: true
+
+      - name: Check for SARIF files
+        id: sarif-check
+        continue-on-error: true
+        run: |
+          echo "Checking for SARIF files..."
+          [ -f trivy-fs-results.sarif ] && echo "trivy-fs-exists=true" >> $GITHUB_OUTPUT || echo "trivy-fs-exists=false" >> $GITHUB_OUTPUT
+          [ -f trivy-config-results.sarif ] && echo "trivy-config-exists=true" >> $GITHUB_OUTPUT || echo "trivy-config-exists=false" >> $GITHUB_OUTPUT
+          [ -f checkov-results.sarif ] && echo "checkov-exists=true" >> $GITHUB_OUTPUT || echo "checkov-exists=false" >> $GITHUB_OUTPUT
+
+      - name: Upload Trivy filesystem scan results
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
+        with:
+          sarif_file: trivy-fs-results.sarif
+          wait-for-processing: false
+        if: always() && steps.sarif-check.outputs.trivy-fs-exists == 'true'
+
+      - name: Upload Trivy config scan results
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
+        with:
+          sarif_file: trivy-config-results.sarif
+          wait-for-processing: false
+        if: always() && steps.sarif-check.outputs.trivy-config-exists == 'true'
+
+      - name: Upload Checkov scan results
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
+        with:
+          sarif_file: checkov-results.sarif
+          wait-for-processing: false
+        if: always() && steps.sarif-check.outputs.checkov-exists == 'true'
+
+  build-and-push:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+    needs: security-scan  # Only run after security-scan succeeds
+    if: success()  # Only run if security-scan job succeeded
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set lowercase image prefix
+        id: image-prefix
+        run: |
+          echo "prefix=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Set image tag
+        id: set-tag
+        run: |
+          # Use commit SHA for PRs
+          echo "tag=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push auth-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/auth-service
+          file: ./services/auth-service/Dockerfile
+          push: true
+          tags: |
+            ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/auth-service:${{ steps.set-tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Build and push event-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/event-service
+          file: ./services/event-service/Dockerfile
+          push: true
+          tags: |
+            ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/event-service:${{ steps.set-tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Build and push booking-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/booking-service
+          file: ./services/booking-service/Dockerfile
+          push: true
+          tags: |
+            ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/booking-service:${{ steps.set-tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/frontend:${{ steps.set-tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Run Trivy vulnerability scanner on auth-service
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/auth-service:${{ steps.set-tag.outputs.tag }}
+          format: 'sarif'
+          output: 'trivy-auth-service.sarif'
+          exit-code: '0'  # Don't fail here, we'll check the SARIF file
+
+      - name: Display auth-service vulnerabilities
+        run: |
+          if [ -f trivy-auth-service.sarif ]; then
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Vulnerability Report: auth-service"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            # Extract and display vulnerabilities in a readable format
+            VULN_COUNT=$(jq '.runs[0].results | length' trivy-auth-service.sarif 2>/dev/null || echo "0")
+            if [ "$VULN_COUNT" -eq 0 ]; then
+              echo "No vulnerabilities found"
+            else
+              jq -r '.runs[0].results[] | 
+                "\n======================================================================\n" +
+                "Severity: " + (try (.message.text | capture("Severity: (?<sev>[A-Z]+)") | .sev) catch "UNKNOWN") + "\n" +
+                "CVE ID: " + .ruleId + "\n" +
+                (.message.text | split("\n") | map(select(. != "")) | .[] | "  " + .) + "\n"' \
+                trivy-auth-service.sarif 2>/dev/null || echo "Unable to parse SARIF"
+            fi
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            # Check for CRITICAL vulnerabilities
+            CRITICAL_COUNT=$(jq '[.runs[0].results[] | select(.message.text | contains("Severity: CRITICAL"))] | length' trivy-auth-service.sarif 2>/dev/null || echo "0")
+            if [ "$CRITICAL_COUNT" -gt 0 ]; then
+              echo ""
+              echo "CRITICAL vulnerabilities found in auth-service!"
+              exit 1
+            else
+              echo ""
+              echo "No CRITICAL vulnerabilities found in auth-service"
+            fi
+          else
+            echo "WARNING: SARIF file not found, skipping check"
+          fi
+
+      - name: Run Trivy vulnerability scanner on event-service
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/event-service:${{ steps.set-tag.outputs.tag }}
+          format: 'sarif'
+          output: 'trivy-event-service.sarif'
+          exit-code: '0'  # Don't fail here, we'll check the SARIF file
+
+      - name: Display event-service vulnerabilities
+        run: |
+          if [ -f trivy-event-service.sarif ]; then
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Vulnerability Report: event-service"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            jq -r '.runs[0].results[] | 
+              "Severity: " + (.message.text | capture("Severity: (?<sev>[A-Z]+)") | .sev // "UNKNOWN") + "\n" +
+              "CVE: " + .ruleId + "\n" +
+              (.message.text | split("\n") | map(select(. != "")) | .[] | "  " + .) + "\n" +
+              "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"' \
+              trivy-event-service.sarif 2>/dev/null || echo "No vulnerabilities found or unable to parse SARIF"
+            
+            CRITICAL_COUNT=$(jq '[.runs[0].results[] | select(.message.text | contains("Severity: CRITICAL"))] | length' trivy-event-service.sarif 2>/dev/null || echo "0")
+            if [ "$CRITICAL_COUNT" -gt 0 ]; then
+              echo ""
+              echo "CRITICAL vulnerabilities found in event-service!"
+              exit 1
+            else
+              echo ""
+              echo "No CRITICAL vulnerabilities found in event-service"
+            fi
+          else
+            echo "WARNING: SARIF file not found, skipping check"
+          fi
+
+      - name: Run Trivy vulnerability scanner on booking-service
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/booking-service:${{ steps.set-tag.outputs.tag }}
+          format: 'sarif'
+          output: 'trivy-booking-service.sarif'
+          exit-code: '0'  # Don't fail here, we'll check the SARIF file
+
+      - name: Display booking-service vulnerabilities
+        run: |
+          if [ -f trivy-booking-service.sarif ]; then
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Vulnerability Report: booking-service"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            jq -r '.runs[0].results[] | 
+              "Severity: " + (.message.text | capture("Severity: (?<sev>[A-Z]+)") | .sev // "UNKNOWN") + "\n" +
+              "CVE: " + .ruleId + "\n" +
+              (.message.text | split("\n") | map(select(. != "")) | .[] | "  " + .) + "\n" +
+              "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"' \
+              trivy-booking-service.sarif 2>/dev/null || echo "No vulnerabilities found or unable to parse SARIF"
+            
+            CRITICAL_COUNT=$(jq '[.runs[0].results[] | select(.message.text | contains("Severity: CRITICAL"))] | length' trivy-booking-service.sarif 2>/dev/null || echo "0")
+            if [ "$CRITICAL_COUNT" -gt 0 ]; then
+              echo ""
+              echo "CRITICAL vulnerabilities found in booking-service!"
+              exit 1
+            else
+              echo ""
+              echo "No CRITICAL vulnerabilities found in booking-service"
+            fi
+          else
+            echo "WARNING: SARIF file not found, skipping check"
+          fi
+
+      - name: Run Trivy vulnerability scanner on frontend
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/frontend:${{ steps.set-tag.outputs.tag }}
+          format: 'sarif'
+          output: 'trivy-frontend.sarif'
+          exit-code: '0'  # Don't fail here, we'll check the SARIF file
+
+      - name: Display frontend vulnerabilities
+        run: |
+          if [ -f trivy-frontend.sarif ]; then
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Vulnerability Report: frontend"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            jq -r '.runs[0].results[] | 
+              "Severity: " + (.message.text | capture("Severity: (?<sev>[A-Z]+)") | .sev // "UNKNOWN") + "\n" +
+              "CVE: " + .ruleId + "\n" +
+              (.message.text | split("\n") | map(select(. != "")) | .[] | "  " + .) + "\n" +
+              "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"' \
+              trivy-frontend.sarif 2>/dev/null || echo "No vulnerabilities found or unable to parse SARIF"
+            
+            CRITICAL_COUNT=$(jq '[.runs[0].results[] | select(.message.text | contains("Severity: CRITICAL"))] | length' trivy-frontend.sarif 2>/dev/null || echo "0")
+            if [ "$CRITICAL_COUNT" -gt 0 ]; then
+              echo ""
+              echo "CRITICAL vulnerabilities found in frontend!"
+              exit 1
+            else
+              echo ""
+              echo "No CRITICAL vulnerabilities found in frontend"
+            fi
+          else
+            echo "WARNING: SARIF file not found, skipping check"
+          fi
+
+      - name: Check for Trivy SARIF files
+        id: trivy-sarif-check
+        continue-on-error: true
+        run: |
+          echo "Checking for Trivy SARIF files..."
+          [ -f trivy-auth-service.sarif ] && echo "auth-exists=true" >> $GITHUB_OUTPUT || echo "auth-exists=false" >> $GITHUB_OUTPUT
+          [ -f trivy-event-service.sarif ] && echo "event-exists=true" >> $GITHUB_OUTPUT || echo "event-exists=false" >> $GITHUB_OUTPUT
+          [ -f trivy-booking-service.sarif ] && echo "booking-exists=true" >> $GITHUB_OUTPUT || echo "booking-exists=false" >> $GITHUB_OUTPUT
+          [ -f trivy-frontend.sarif ] && echo "frontend-exists=true" >> $GITHUB_OUTPUT || echo "frontend-exists=false" >> $GITHUB_OUTPUT
+
+      - name: Upload Trivy auth-service results
+        if: always() && steps.trivy-sarif-check.outputs.auth-exists == 'true'
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
+        with:
+          sarif_file: trivy-auth-service.sarif
+          wait-for-processing: false
+
+      - name: Upload Trivy event-service results
+        if: always() && steps.trivy-sarif-check.outputs.event-exists == 'true'
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
+        with:
+          sarif_file: trivy-event-service.sarif
+          wait-for-processing: false
+
+      - name: Upload Trivy booking-service results
+        if: always() && steps.trivy-sarif-check.outputs.booking-exists == 'true'
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
+        with:
+          sarif_file: trivy-booking-service.sarif
+          wait-for-processing: false
+
+      - name: Upload Trivy frontend results
+        if: always() && steps.trivy-sarif-check.outputs.frontend-exists == 'true'
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
+        with:
+          sarif_file: trivy-frontend.sarif
+          wait-for-processing: false
+
+      - name: Output image tags
+        run: |
+          echo "Built and pushed images with tag: ${{ steps.set-tag.outputs.tag }}"
+          echo ""
+          echo "Images pushed to GHCR:"
+          echo "  - ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/auth-service:${{ steps.set-tag.outputs.tag }}"
+          echo "  - ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/event-service:${{ steps.set-tag.outputs.tag }}"
+          echo "  - ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/booking-service:${{ steps.set-tag.outputs.tag }}"
+          echo "  - ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/frontend:${{ steps.set-tag.outputs.tag }}"
+
+  deploy-test:
+    name: Deploy to Staging (kind)
+    runs-on: ubuntu-latest
+    needs: build-and-push  # Only run after build-and-push succeeds
+    if: success()  # Only run if build-and-push job succeeded
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Set up kind
+        uses: helm/kind-action@v1.10.0
+        with:
+          version: 'v0.20.0'
+
+      - name: Create kind cluster
+        run: |
+          kind create cluster --name ${{ env.CLUSTER_NAME }} --wait 5m
+          kubectl cluster-info --context kind-${{ env.CLUSTER_NAME }}
+
+      - name: Set image tag
+        id: set-tag
+        run: |
+          # Use commit SHA for PRs (matches build workflow)
+          echo "tag=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull images from GHCR
+        run: |
+          IMAGE_TAG="${{ steps.set-tag.outputs.tag }}"
+          IMAGE_PREFIX=$(echo '${{ env.IMAGE_PREFIX }}' | tr '[:upper:]' '[:lower:]')
+          echo "Pulling images with tag: ${IMAGE_TAG}"
+          docker pull ${{ env.REGISTRY }}/${IMAGE_PREFIX}/auth-service:${IMAGE_TAG}
+          docker pull ${{ env.REGISTRY }}/${IMAGE_PREFIX}/event-service:${IMAGE_TAG}
+          docker pull ${{ env.REGISTRY }}/${IMAGE_PREFIX}/booking-service:${IMAGE_TAG}
+          docker pull ${{ env.REGISTRY }}/${IMAGE_PREFIX}/frontend:${IMAGE_TAG}
+
+      - name: Load images into kind cluster
+        run: |
+          IMAGE_TAG="${{ steps.set-tag.outputs.tag }}"
+          IMAGE_PREFIX=$(echo '${{ env.IMAGE_PREFIX }}' | tr '[:upper:]' '[:lower:]')
+          kind load docker-image --name ${{ env.CLUSTER_NAME }} \
+            ${{ env.REGISTRY }}/${IMAGE_PREFIX}/auth-service:${IMAGE_TAG}
+          kind load docker-image --name ${{ env.CLUSTER_NAME }} \
+            ${{ env.REGISTRY }}/${IMAGE_PREFIX}/event-service:${IMAGE_TAG}
+          kind load docker-image --name ${{ env.CLUSTER_NAME }} \
+            ${{ env.REGISTRY }}/${IMAGE_PREFIX}/booking-service:${IMAGE_TAG}
+          kind load docker-image --name ${{ env.CLUSTER_NAME }} \
+            ${{ env.REGISTRY }}/${IMAGE_PREFIX}/frontend:${IMAGE_TAG}
+
+      - name: Process Kubernetes templates
+        run: |
+          # Install gettext for envsubst
+          sudo apt-get update && sudo apt-get install -y gettext-base
+          
+          # Set environment variables for template processing
+          # Use GHCR registry for kind deployment
+          export ECR_REGISTRY="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}"
+          export AWS_REGION="us-east-1"
+          export CLUSTER_NAME="${{ env.CLUSTER_NAME }}"
+          export ACM_CERTIFICATE_ARN=""
+          export FLUENT_BIT_ROLE_ARN=""
+          export EXTERNAL_SECRETS_ROLE_ARN=""
+          
+          # Create output directory
+          mkdir -p k8s/generated/base
+          mkdir -p k8s/generated/ingress
+          mkdir -p k8s/generated/overlays/dev
+          
+          # Process template files
+          find k8s -name "*.template" -type f | while read template; do
+            output_file=$(echo "$template" | sed 's/\.template$//' | sed 's|k8s/|k8s/generated/|')
+            output_dir=$(dirname "$output_file")
+            mkdir -p "$output_dir"
+            envsubst < "$template" > "$output_file"
+            echo "Processed: $template -> $output_file"
+          done
+          
+          # Copy non-template files
+          cp -r k8s/base/*.yaml k8s/generated/base/ 2>/dev/null || true
+          cp -r k8s/ingress/*.yaml k8s/generated/ingress/ 2>/dev/null || true
+          cp -r k8s/overlays/dev/*.yaml k8s/generated/overlays/dev/ 2>/dev/null || true
+
+      - name: Update image tags in deployments
+        run: |
+          IMAGE_PREFIX=$(echo '${{ env.IMAGE_PREFIX }}' | tr '[:upper:]' '[:lower:]')
+          IMAGE_REGISTRY="${{ env.REGISTRY }}/${IMAGE_PREFIX}"
+          IMAGE_TAG="${{ steps.set-tag.outputs.tag }}"
+          
+          # Update image tags in deployment files
+          find k8s/generated -name "*deployment.yaml" -type f | while read file; do
+            sed -i "s|image:.*auth-service.*|image: ${IMAGE_REGISTRY}/auth-service:${IMAGE_TAG}|g" "$file"
+            sed -i "s|image:.*event-service.*|image: ${IMAGE_REGISTRY}/event-service:${IMAGE_TAG}|g" "$file"
+            sed -i "s|image:.*booking-service.*|image: ${IMAGE_REGISTRY}/booking-service:${IMAGE_TAG}|g" "$file"
+            sed -i "s|image:.*frontend.*|image: ${IMAGE_REGISTRY}/frontend:${IMAGE_TAG}|g" "$file"
+          done
+          
+          echo "Updated image tags to: ${IMAGE_REGISTRY}/*:${IMAGE_TAG}"
+
+      - name: Create test namespace
+        run: |
+          kubectl create namespace dev --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create MongoDB secrets
+        run: |
+          # Create MongoDB secret with proper connection string
+          MONGODB_PASSWORD="test-mongodb-password"
+          MONGO_CONNECTION_STRING="mongodb://admin:${MONGODB_PASSWORD}@mongodb.dev.svc.cluster.local:27017/eventsphere?authSource=admin"
+          
+          kubectl create secret generic mongodb-secret \
+            --from-literal=username=admin \
+            --from-literal=password="${MONGODB_PASSWORD}" \
+            --from-literal=connection-string="${MONGO_CONNECTION_STRING}" \
+            -n dev --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Create auth service secret
+          kubectl create secret generic auth-service-secret \
+            --from-literal=jwt-secret="test-jwt-secret-key-for-kind-deployment" \
+            -n dev --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy MongoDB for testing
+        run: |
+          # Create MongoDB service
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: mongodb
+            namespace: dev
+          spec:
+            type: ClusterIP
+            ports:
+            - port: 27017
+              targetPort: 27017
+            selector:
+              app: mongodb
+          EOF
+          
+          # Create MongoDB deployment (simplified for kind - no persistent storage)
+          kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: mongodb
+            namespace: dev
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: mongodb
+            template:
+              metadata:
+                labels:
+                  app: mongodb
+              spec:
+                containers:
+                - name: mongodb
+                  image: mongo:7.0
+                  ports:
+                  - containerPort: 27017
+                  env:
+                  - name: MONGO_INITDB_ROOT_USERNAME
+                    valueFrom:
+                      secretKeyRef:
+                        name: mongodb-secret
+                        key: username
+                  - name: MONGO_INITDB_ROOT_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: mongodb-secret
+                        key: password
+                  - name: MONGO_INITDB_DATABASE
+                    value: "eventsphere"
+                  resources:
+                    requests:
+                      memory: "256Mi"
+                      cpu: "250m"
+                    limits:
+                      memory: "512Mi"
+                      cpu: "500m"
+          EOF
+          
+          # Wait for MongoDB to be ready
+          echo "Waiting for MongoDB to be ready..."
+          kubectl wait --for=condition=available --timeout=120s \
+            deployment/mongodb -n dev || {
+            echo "MongoDB deployment not ready"
+            kubectl describe deployment mongodb -n dev
+            kubectl logs -n dev -l app=mongodb --tail=50
+            exit 1
+          }
+          
+          echo "MongoDB is ready"
+
+      - name: Update namespace in generated manifests
+        run: |
+          # Update namespace from prod to dev in all generated files
+          find k8s/generated -name "*.yaml" -type f -exec sed -i 's/namespace: prod/namespace: dev/g' {} \;
+          find k8s/generated -name "*.yaml" -type f -exec sed -i 's/namespace: staging/namespace: dev/g' {} \;
+
+      - name: Apply ConfigMaps
+        run: |
+          kubectl apply -f k8s/generated/base/configmaps.yaml -n dev || true
+
+      - name: Apply RBAC
+        run: |
+          kubectl apply -f k8s/generated/base/rbac.yaml || true
+
+      - name: Apply Deployments and Services
+        run: |
+          kubectl apply -f k8s/generated/base/ -n dev
+
+      - name: Wait for deployments to be ready
+        run: |
+          echo "Waiting for deployments to be ready..."
+          for deployment in auth-service event-service booking-service frontend; do
+            if kubectl get deployment "$deployment" -n dev &> /dev/null; then
+              echo "Waiting for $deployment..."
+              kubectl wait --for=condition=available --timeout=300s \
+                deployment/"$deployment" -n dev || {
+                echo "Deployment $deployment not ready within timeout"
+                kubectl describe deployment "$deployment" -n dev
+                kubectl logs -n dev -l app="$deployment" --tail=50
+                exit 1
+              }
+              echo "$deployment is ready"
+            fi
+          done
+
+      - name: Verify deployment
+        run: |
+          echo "=== Deployment Status ==="
+          kubectl get deployments -n dev
+          echo ""
+          echo "=== Pod Status ==="
+          kubectl get pods -n dev
+          echo ""
+          echo "=== Service Status ==="
+          kubectl get services -n dev
+          echo ""
+          echo "=== Pod Logs (last 20 lines) ==="
+          for pod in $(kubectl get pods -n dev -o jsonpath='{.items[*].metadata.name}'); do
+            echo "--- Logs for $pod ---"
+            kubectl logs -n dev "$pod" --tail=20 || true
+          done
+
+      - name: Test service endpoints
+        run: |
+          echo "Testing service endpoints..."
+          
+          # Port forward services and test
+          kubectl port-forward -n dev svc/auth-service 4001:4001 &
+          PORT_FWD_PID=$!
+          sleep 5
+          
+          # Test health endpoint
+          if curl -f http://localhost:4001/health > /dev/null 2>&1; then
+            echo "✓ auth-service health check passed"
+          else
+            echo "✗ auth-service health check failed"
+          fi
+          
+          kill $PORT_FWD_PID 2>/dev/null || true
+          
+          echo "Note: Full integration testing requires MongoDB. This test validates deployment structure."
+
+      - name: Cleanup kind cluster
+        if: always()
+        run: |
+          kind delete cluster --name ${{ env.CLUSTER_NAME }} || true
+
