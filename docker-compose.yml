@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # MongoDB Database
   mongodb:
@@ -8,8 +6,8 @@ services:
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS}
     volumes:
       - mongo-data:/data/db
     networks:
@@ -30,8 +28,8 @@ services:
       - "4001:4001"
     environment:
       PORT: 4001
-      MONGO_URI: mongodb://admin:password@mongodb:27017/auth?authSource=admin
-      JWT_SECRET: production-secret-key-change-this
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/auth?authSource=admin
+      JWT_SECRET: ${JWT_SECRET}
       NODE_ENV: production
     depends_on:
       mongodb:
@@ -50,7 +48,7 @@ services:
       - "4002:4002"
     environment:
       PORT: 4002
-      MONGO_URI: mongodb://admin:password@mongodb:27017/events?authSource=admin
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/auth?authSource=admin
       AUTH_SERVICE_URL: http://auth-service:4001
       NODE_ENV: production
     depends_on:
@@ -72,7 +70,7 @@ services:
       - "4003:4003"
     environment:
       PORT: 4003
-      MONGO_URI: mongodb://admin:password@mongodb:27017/bookings?authSource=admin
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/auth?authSource=admin
       AUTH_SERVICE_URL: http://auth-service:4001
       EVENT_SERVICE_URL: http://event-service:4002
       NODE_ENV: production
