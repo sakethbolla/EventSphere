@@ -352,18 +352,65 @@ jobs:
           sarif_file: trivy-frontend.sarif
           wait-for-processing: false
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.2.1'
+
+      - name: Sign auth-service image (GHCR)
+        env:
+          IMAGE_REF: ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/auth-service:${{ steps.set-tag.outputs.tag }}
+        run: |
+          echo "Signing image: ${IMAGE_REF}"
+          cosign sign --yes ${IMAGE_REF}
+
+      - name: Sign event-service image (GHCR)
+        env:
+          IMAGE_REF: ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/event-service:${{ steps.set-tag.outputs.tag }}
+        run: |
+          echo "Signing image: ${IMAGE_REF}"
+          cosign sign --yes ${IMAGE_REF}
+
+      - name: Sign booking-service image (GHCR)
+        env:
+          IMAGE_REF: ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/booking-service:${{ steps.set-tag.outputs.tag }}
+        run: |
+          echo "Signing image: ${IMAGE_REF}"
+          cosign sign --yes ${IMAGE_REF}
+
+      - name: Sign frontend image (GHCR)
+        env:
+          IMAGE_REF: ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/frontend:${{ steps.set-tag.outputs.tag }}
+        run: |
+          echo "Signing image: ${IMAGE_REF}"
+          cosign sign --yes ${IMAGE_REF}
+
+      - name: Sign images in ECR (if available)
+        if: github.event_name != 'pull_request' && steps.login-ecr.outputs.registry != ''
+        continue-on-error: true
+        run: |
+          ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+          IMAGE_PREFIX="${{ steps.image-prefix.outputs.prefix }}"
+          IMAGE_TAG="${{ steps.set-tag.outputs.tag }}"
+          
+          for service in auth-service event-service booking-service frontend; do
+            IMAGE_REF="${ECR_REGISTRY}/${IMAGE_PREFIX}/${service}:${IMAGE_TAG}"
+            echo "Signing ECR image: ${IMAGE_REF}"
+            cosign sign --yes ${IMAGE_REF} || echo "Warning: Failed to sign ${IMAGE_REF}"
+          done
+
       - name: Output image tags
         run: |
           echo "Built and pushed images with tag: ${{ steps.set-tag.outputs.tag }}"
           echo ""
-          echo "Images pushed to GHCR:"
+          echo "Images pushed to GHCR (signed):"
           echo "  - ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/auth-service:${{ steps.set-tag.outputs.tag }}"
           echo "  - ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/event-service:${{ steps.set-tag.outputs.tag }}"
           echo "  - ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/booking-service:${{ steps.set-tag.outputs.tag }}"
           echo "  - ${{ env.GHCR_REGISTRY }}/${{ steps.image-prefix.outputs.prefix }}/frontend:${{ steps.set-tag.outputs.tag }}"
           if [ -n "${{ steps.login-ecr.outputs.registry }}" ]; then
             echo ""
-            echo "Images also pushed to ECR:"
+            echo "Images also pushed to ECR (signed):"
             echo "  - ${{ steps.login-ecr.outputs.registry }}/${{ steps.image-prefix.outputs.prefix }}/auth-service:${{ steps.set-tag.outputs.tag }}"
             echo "  - ${{ steps.login-ecr.outputs.registry }}/${{ steps.image-prefix.outputs.prefix }}/event-service:${{ steps.set-tag.outputs.tag }}"
             echo "  - ${{ steps.login-ecr.outputs.registry }}/${{ steps.image-prefix.outputs.prefix }}/booking-service:${{ steps.set-tag.outputs.tag }}"
