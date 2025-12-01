@@ -35,12 +35,14 @@ RUN rm -f /etc/nginx/conf.d/default.conf
 COPY --chown=nginx:nginx nginx.conf /etc/nginx/conf.d/default.conf
 
 # Set NET_BIND_SERVICE capability on nginx binary for non-root port 80 binding
-# Keep libcap-bin (minimal ~50KB) to ensure capability support is available
+# In Alpine, libcap package includes both library and binaries (setcap, getcap)
 # The capability is set on the binary AND granted by Kubernetes securityContext
-RUN apk add --no-cache libcap libcap-bin && \
+RUN apk add --no-cache libcap && \
     setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx && \
     # Verify capability was set
-    getcap /usr/sbin/nginx
+    getcap /usr/sbin/nginx && \
+    # Keep libcap for verification (it's small ~50KB)
+    echo "Capability set successfully"
 
 # Create health check script
 RUN echo '#!/bin/sh' > /usr/local/bin/healthcheck.sh && \
