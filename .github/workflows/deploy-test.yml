@@ -257,6 +257,42 @@ jobs:
           find k8s/generated -name "*.yaml" -type f -exec sed -i 's/namespace: prod/namespace: dev/g' {} \;
           find k8s/generated -name "*.yaml" -type f -exec sed -i 's/namespace: staging/namespace: dev/g' {} \;
 
+      - name: Validate Kubernetes manifests with Kyverno
+        run: |
+          echo "Installing Kyverno CLI..."
+          curl -LO "https://github.com/kyverno/kyverno/releases/latest/download/kyverno-cli-linux-amd64.tar.gz"
+          tar -xzf kyverno-cli-linux-amd64.tar.gz
+          chmod +x kyverno
+          sudo mv kyverno /usr/local/bin/
+          kyverno version
+          
+          echo "Validating Kubernetes manifests with Kyverno policies..."
+          
+          # Validate all generated manifests against policies
+          # Create a temporary directory for validation
+          mkdir -p /tmp/kyverno-validation
+          
+          # Copy all manifests to validate
+          for manifest_dir in k8s/generated/base k8s/generated/ingress; do
+            if [ -d "$manifest_dir" ]; then
+              echo "Validating manifests in $manifest_dir..."
+              find "$manifest_dir" -name "*.yaml" -type f -exec cp {} /tmp/kyverno-validation/ \;
+            fi
+          done
+          
+          # Run Kyverno validation on all manifests
+          if [ "$(ls -A /tmp/kyverno-validation)" ]; then
+            echo "Running Kyverno policy validation..."
+            if ! kyverno apply k8s/security/kyverno-policies.yaml --resource /tmp/kyverno-validation/; then
+              echo "❌ Kyverno validation failed"
+              echo "Review the output above for policy violations"
+              exit 1
+            fi
+            echo "✅ All manifests passed Kyverno validation"
+          else
+            echo "⚠️ No manifests found to validate"
+          fi
+
       - name: Apply ConfigMaps
         run: |
           kubectl apply -f k8s/generated/base/configmaps.yaml -n dev || true

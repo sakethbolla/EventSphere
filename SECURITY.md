@@ -181,6 +181,25 @@ securityContext:
 - **Readiness Probes**: Prevent traffic to unready pods
 - **Startup Probes**: Allow slow-starting applications
 
+### Policy Validation with Kyverno
+
+Kubernetes manifests are validated against security policies using Kyverno before deployment:
+
+- **Location**: `k8s/security/kyverno-policies.yaml`
+- **Enforcement**: Policies are enforced in CI/CD pipeline before `kubectl apply`
+- **Policies Enforced**:
+  - Non-root user requirement (enforced)
+  - Resource limits requirement (enforced)
+  - Privilege escalation disabled (enforced)
+  - Read-only root filesystem (audit mode)
+  - Capability restrictions (audit mode)
+
+**Validation Process:**
+1. Kyverno CLI is installed in deployment workflows
+2. All generated manifests are validated against policies
+3. Deployment is blocked if validation fails
+4. Only compliant manifests proceed to deployment
+
 ## Network Security
 
 ### Network Policies
@@ -299,6 +318,11 @@ Network policies enforce least-privilege communication:
    - Reports uploaded to GitHub Security
 
 2. **Deploy Stage**:
+   - **Kyverno Policy Validation**: Validates Kubernetes manifests against security policies before deployment
+     - Enforces non-root containers
+     - Validates resource limits
+     - Checks privilege escalation settings
+     - Verifies security context configurations
    - Validates Kubernetes manifests
    - Checks for security misconfigurations
    - Automatic rollback on failure
@@ -369,10 +393,11 @@ Network policies enforce least-privilege communication:
 
 - [x] Image signing with cosign (keyless signing)
 - [x] Mandatory signature verification (blocks deployment if verification fails)
+- [x] Kyverno policy validation in CI/CD pipeline
 - [ ] Service Mesh (mTLS between services)
 - [ ] Automated secret rotation
 - [ ] WAF on ALB
-- [ ] OPA Gatekeeper for policy enforcement
+- [ ] OPA Gatekeeper for runtime policy enforcement (in-cluster)
 - [ ] Falco for runtime security
 - [ ] Regular penetration testing
 - [ ] Security training for team
