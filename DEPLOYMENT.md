@@ -83,49 +83,62 @@ kubectl get nodes -o wide
 
 You should see at least 3 nodes across multiple availability zones.
 
-## Step 2: Set Up Image Signing (Optional but Recommended)
+## Step 2: Image Signing (Automatic)
 
-### 2.1 Generate Cosign Key Pair
+### 2.1 Automatic Keyless Signing
 
-Image signing with cosign provides supply chain security by ensuring images haven't been tampered with.
+EventSphere uses **keyless signing** with Cosign, which means:
 
-1. Install cosign:
-   ```bash
-   # macOS
-   brew install cosign
-   
-   # Linux
-   wget https://github.com/sigstore/cosign/releases/download/v2.2.1/cosign-linux-amd64
-   sudo mv cosign-linux-amd64 /usr/local/bin/cosign
-   sudo chmod +x /usr/local/bin/cosign
-   ```
+- **No setup required** - signing happens automatically in CI/CD
+- **No key management** - uses GitHub Actions OIDC tokens
+- **Secure by default** - all images are automatically signed
+- **Verification enforced** - deployments verify signatures before pulling images
 
-2. Generate key pair:
-   ```bash
-   cosign generate-key-pair
-   ```
-   
-   This creates:
-   - `cosign.key` (private key - keep secret!)
-   - `cosign.pub` (public key - can be shared)
+### How It Works
 
-3. Add keys to GitHub Secrets:
-   - Go to your GitHub repository → Settings → Secrets and variables → Actions
-   - Add the following secrets:
-     - `COSIGN_PRIVATE_KEY`: Contents of `cosign.key` file
-     - `COSIGN_PUBLIC_KEY`: Contents of `cosign.pub` file
-     - `COSIGN_PASSWORD`: Password used when generating keys (if set)
+1. **Automatic Signing:**
+   - Images are built, pushed to container registries, then automatically signed in CI/CD pipelines
+   - Uses Cosign v2.2.1 with GitHub Actions OIDC authentication
+   - Signatures stored alongside images in container registries (GHCR/ECR)
 
-4. Store keys securely:
-   ```bash
-   # Backup keys to secure location
-   mkdir -p ~/.cosign
-   mv cosign.key ~/.cosign/eventsphere.key
-   mv cosign.pub ~/.cosign/eventsphere.pub
-   chmod 600 ~/.cosign/eventsphere.key
-   ```
+2. **Automatic Verification:**
+   - Signatures are verified before deployment in staging and production
+   - Deployment is blocked if signature verification fails
+   - Ensures only signed, untampered images are deployed
 
-**Note**: If you skip this step, image signing will be skipped in CI/CD pipelines, but images will still be built and pushed.
+3. **No Manual Steps Required:**
+   - No keys to generate or manage
+   - No secrets to configure
+   - Works automatically in all workflows
+
+### Manual Verification (Optional)
+
+If you want to manually verify image signatures locally:
+
+```bash
+# Install cosign
+# macOS
+brew install cosign
+
+# Linux
+wget https://github.com/sigstore/cosign/releases/download/v2.2.1/cosign-linux-amd64
+sudo mv cosign-linux-amd64 /usr/local/bin/cosign
+sudo chmod +x /usr/local/bin/cosign
+
+# Verify GHCR image
+cosign verify \
+  --certificate-identity-regexp=".*" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+  ghcr.io/OWNER/REPO/auth-service:TAG
+
+# Verify ECR image
+cosign verify \
+  --certificate-identity-regexp=".*" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+  ACCOUNT.dkr.ecr.REGION.amazonaws.com/auth-service:TAG
+```
+
+**Note**: Image signing and verification are fully automated in CI/CD - no manual configuration needed!
 
 ## Step 3: Set Up ECR Repositories
 
@@ -527,10 +540,10 @@ kubectl auth can-i get secret/mongodb-secret \
 ```
 
 **RBAC Features:**
-- ✅ Service accounts for all microservices (dev, staging, prod)
-- ✅ Least-privilege roles for each service
-- ✅ User roles: Developer (read-only prod), Operator (full access), Admin
-- ✅ Namespace isolation with different access levels
+- Service accounts for all microservices (dev, staging, prod)
+- Least-privilege roles for each service
+- User roles: Developer (read-only prod), Operator (full access), Admin
+- Namespace isolation with different access levels
 
 **To add human users to the cluster**, see `k8s/base/RBAC_README.md` for detailed instructions.
 

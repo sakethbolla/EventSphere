@@ -21,7 +21,7 @@ The system is composed of the following independently running services:
 
 All services communicate over HTTP and store data in MongoDB. Ensure that a MongoDB instance is running locally and that each service's `.env` file points to it.
 
-> ℹ️ Ready-to-use `.env` files are committed with non-sensitive development defaults (local MongoDB URLs, service ports, and JWT secret). You can start the stack immediately and tailor the values later if needed.
+> Note: Ready-to-use `.env` files are committed with non-sensitive development defaults (local MongoDB URLs, service ports, and JWT secret). You can start the stack immediately and tailor the values later if needed.
 
 ## Project Structure
 ```
@@ -47,7 +47,7 @@ EventSphere/
 │   └── cloudwatch/              # CloudWatch logging
 ├── .github/                     # CI/CD workflows
 │   └── workflows/               # GitHub Actions
-│       ├── ci-pr.yml            # Combined CI pipeline for PRs (Security Scan → Build → Deploy)
+│       ├── ci-pr.yml            # CI pipeline for PRs (Security Scan → Build, Push & Sign)
 │       ├── security-scan.yml    # Security scanning workflow (main branch)
 │       ├── build.yml            # Build and push Docker images (main branch)
 │       ├── deploy-test.yml      # Deploy to Staging (kind cluster)
@@ -106,7 +106,7 @@ The React development server will proxy API requests to the backend services whe
    ```
 3. The response contains a JWT and the user object. Store the token (the frontend writes it to `localStorage`) and log in through the UI using the same credentials.
 
-> ℹ️ Already registered users can also be promoted by updating the `role` field to `admin` directly in MongoDB.
+> Note: Already registered users can also be promoted by updating the `role` field to `admin` directly in MongoDB.
 
 ### Managing events as an admin
 1. Log in with an administrator account. The navbar reveals a **Manage Events** link that routes to `/admin/events`.
@@ -145,14 +145,15 @@ EventSphere includes automated CI/CD workflows using GitHub Actions following in
 #### On Pull Requests (Continuous Integration)
 The `ci-pr.yml` workflow runs all steps sequentially in a single workflow:
 ```
-Security Scan → Build → Deploy to Staging
+Security Scan → Build, Push, and Sign Images
 ```
 - **Sequential execution**: Each step only runs after the previous one succeeds
 - **Job dependencies**: Uses `needs:` to ensure proper ordering
 - Validates code quality and security
-- Builds and tests Docker images
-- Tests deployment in staging environment (kind cluster)
+- Builds Docker images, pushes them to GHCR, then signs them with Cosign (keyless signing via OIDC)
+- **Fast feedback**: No deployment step - keeps PR checks quick
 - All checks must pass before PR can be merged
+- **Note**: Full deployment validation happens on main branch after merge
 
 #### On Main Branch (Continuous Deployment)
 Separate workflows trigger sequentially via `workflow_run`:
@@ -168,11 +169,13 @@ Security Scan → Build → Deploy to Staging → Deploy to Production
 ### Available Workflows
 
 1. **CI Pipeline (PR)** (`ci-pr.yml`) - **For Pull Requests**
-   - **Combined workflow** with sequential jobs: Security Scan → Build → Deploy to Staging
+   - **Streamlined workflow** with sequential jobs: Security Scan → Build, Push, and Sign Images
    - Runs on pull requests targeting `main` branch
    - **Job dependencies**: Each job uses `needs:` to wait for previous job success
-   - All three steps run in a single workflow for better visibility and control
-   - **Purpose**: Validate PRs before merging to main
+   - **Image Process**: Builds images, pushes to GHCR, then signs them with Cosign using keyless signing (OIDC)
+   - **Fast feedback**: No deployment step - keeps PR checks fast (~3-5 minutes)
+   - **Purpose**: Validate code security and build quality before merging to main
+   - **Note**: Full deployment validation happens on main branch after merge
 
 2. **Security Scan** (`security-scan.yml`) - **For Main Branch**
    - **Runs first** - Must pass before build workflow runs
@@ -188,6 +191,10 @@ Security Scan → Build → Deploy to Staging → Deploy to Production
    - **Runs after security scan passes** - Only builds if code is secure
    - Triggered by `workflow_run` from Security Scan workflow
    - Builds Docker images for all 4 services (auth, event, booking, frontend)
+   - **Pushes images** to container registries (GHCR and optionally ECR)
+   - **Image Signing**: After push, all images are automatically signed with Cosign using keyless signing (OIDC)
+     - No key management required - uses GitHub Actions OIDC tokens
+     - Signatures stored alongside images in container registry
    - **Dual Registry Support**:
      - **GHCR (GitHub Container Registry)**: Always pushes - required for all deployments
      - **ECR (Amazon ECR)**: Optional - pushes if `AWS_ROLE_ARN` secret is configured
@@ -197,21 +204,22 @@ Security Scan → Build → Deploy to Staging → Deploy to Production
    - Triggers `deploy-test.yml` via `workflow_run` after successful completion
 
 4. **Deploy to Staging** (`deploy-test.yml`) - **FREE, No AWS Required!**
-   - **Runs automatically after successful builds**
-   - For PRs: Runs as part of `ci-pr.yml` workflow
-   - For main branch: Triggered by `workflow_run` from Build workflow
+   - **Runs automatically after successful builds on main branch**
+   - Triggered by `workflow_run` from Build workflow
+   - **Image Verification**: Verifies image signatures before pulling (ensures images are signed)
    - Uses kind (Kubernetes in Docker) to create temporary staging cluster
    - Validates Kubernetes manifests, deploys services, runs health checks
    - Tests deployment structure and service startup
    - Automatically tears down cluster after testing
    - **Cost: $0** - Meets CI/CD deployment requirement without AWS costs
    - **Purpose**: Staging environment validation before production
-   - For main branch: Triggers `deploy.yml` via `workflow_run` after successful completion
+   - Triggers `deploy.yml` via `workflow_run` after successful completion
 
 5. **Deploy to Production** (`deploy.yml`) - **EKS Production Deployment**
    - **Runs automatically on main branch** after staging deployment succeeds
    - Triggered by `workflow_run` from Deploy to Staging workflow
    - Can also be triggered manually for other environments (staging, dev)
+   - **Image Verification**: Verifies image signatures before deployment (ensures images are signed and untampered)
    - Deploys to AWS EKS production cluster
    - Processes Kubernetes templates, updates image tags, applies manifests
    - Includes automatic rollback on failure
@@ -233,16 +241,13 @@ Security Scan → Build → Deploy to Staging → Deploy to Production
        │
        ▼
 ┌─────────────┐
-│ Build & Push│ ◄─── Pushes to GHCR (always)
-│             │      Optionally pushes to ECR
-│ commit SHA  │      (won't fail if ECR unavailable)
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│Deploy Stage │ ◄─── Tests in kind cluster
-│  (kind)     │      Validates deployment
+│ Build, Push │ ◄─── Pushes to GHCR (always)
+│ & Sign      │      Then signs with Cosign
+│ commit SHA  │      (keyless signing via OIDC)
 └─────────────┘
+       │
+       └─── Fast feedback (~3-5 min)
+            No deployment step
 ```
 
 #### Main Branch Flow (CD)
@@ -258,36 +263,37 @@ Security Scan → Build → Deploy to Staging → Deploy to Production
        │
        ▼
 ┌─────────────┐
-│ Build & Push│ ◄─── Pushes to GHCR + ECR (if configured)
-│             │
-│ commit SHA  │
+│ Build, Push │ ◄─── Pushes to GHCR + ECR (if configured)
+│ & Sign      │      Then signs with Cosign
+│ commit SHA  │      (keyless signing via OIDC)
 └──────┬──────┘
        │
        ▼
 ┌─────────────┐
-│Deploy Stage │ ◄─── Final validation
-│  (kind)     │
+│Deploy Stage │ ◄─── Verifies signatures
+│  (kind)     │      Final validation
 └──────┬──────┘
        │
        ▼
 ┌─────────────┐
-│Deploy Prod  │ ◄─── AUTO-DEPLOYS to EKS!
-│   (EKS)     │      Only if staging succeeds
+│Deploy Prod  │ ◄─── Verifies signatures
+│   (EKS)     │      AUTO-DEPLOYS to EKS!
+│             │      Only if staging succeeds
 └─────────────┘
 ```
 
 ### Image Registry Strategy
 
 - **GHCR (GitHub Container Registry)**: 
-  - ✅ Always used - required for all deployments
-  - ✅ Free - no AWS costs
-  - ✅ Works for staging and production
+  - Always used - required for all deployments
+  - Free - no AWS costs
+  - Works for staging and production
   
 - **ECR (Amazon ECR)**: 
-  - ⚙️ Optional - only if `AWS_ROLE_ARN` secret is configured
-  - ⚙️ Won't fail build if unavailable
-  - ⚙️ Useful for production deployments preferring ECR
-  - ⚙️ Requires AWS infrastructure setup
+  - Optional - only if `AWS_ROLE_ARN` secret is configured
+  - Won't fail build if unavailable
+  - Useful for production deployments preferring ECR
+  - Requires AWS infrastructure setup
 
 ### Quick Start - CI/CD
 
@@ -296,20 +302,22 @@ Security Scan → Build → Deploy to Staging → Deploy to Production
 # Create a PR - the ci-pr.yml workflow runs automatically:
 # All steps run sequentially in a single workflow:
 # 1. Security Scan → validates code security (must pass)
-# 2. Build → builds and pushes images to GHCR (tagged with commit SHA)
-#           Only runs if Security Scan succeeds
-# 3. Deploy to Staging → tests deployment in kind cluster
-#           Only runs if Build succeeds
+# 2. Build, Push & Sign → builds images, pushes to GHCR, then signs them
+#                        Images are signed with Cosign (keyless signing via OIDC)
+#                        Only runs if Security Scan succeeds
 # All checks must pass before PR can be merged
+# Note: Deployment validation happens on main branch after merge
 ```
 
 **On Main Branch (Automatic Production Deployment):**
 ```bash
 # Merge PR to main - the following runs automatically:
 # 1. Security Scan → validates code security
-# 2. Build → builds and pushes images to GHCR + ECR (tagged with commit SHA)
-# 3. Deploy to Staging → final validation in kind cluster
-# 4. Deploy to Production → automatic deployment to EKS (if staging succeeds)
+# 2. Build, Push & Sign → builds images, pushes to GHCR + ECR, then signs them
+#                        Images are signed with Cosign (keyless signing via OIDC)
+# 3. Deploy to Staging → verifies signatures, final validation in kind cluster
+# 4. Deploy to Production → verifies signatures, automatic deployment to EKS
+#                          (only if staging succeeds)
 ```
 
 **Manual Production Deployment:**

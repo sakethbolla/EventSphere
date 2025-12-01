@@ -31,71 +31,77 @@ EventSphere implements defense-in-depth security principles across all layers of
 
 ### Image Signing
 
-- **Implementation**: cosign v2.2.1 integrated in CI/CD pipeline
-- **Key Management**: Private keys stored in GitHub Secrets
-- **Signing Process**: Images are signed after successful Trivy scan and push to ECR
+- **Implementation**: Cosign v2.2.1 integrated in CI/CD pipeline
+- **Signing Method**: Keyless signing using GitHub Actions OIDC tokens
+- **Benefits**: No key management required, automatic signing, secure by default
+- **Signing Process**: Images are automatically signed after successful build and push
 - **Verification**: Signatures are verified before deployment in CI/CD pipeline
+- **Failure Behavior**: Deployment is blocked if signature verification fails
 
-#### Cosign Key Setup
+#### Keyless Signing with OIDC
 
-1. **Generate Key Pair:**
-   ```bash
-   cosign generate-key-pair
-   ```
-   This creates:
-   - `cosign.key` (private key - keep secret!)
-   - `cosign.pub` (public key - can be shared)
+EventSphere uses **keyless signing** with Cosign, which eliminates the need for manual key management:
 
-2. **Store Keys in GitHub Secrets:**
-   - `COSIGN_PRIVATE_KEY`: Contents of `cosign.key`
-   - `COSIGN_PUBLIC_KEY`: Contents of `cosign.pub`
-   - `COSIGN_PASSWORD`: Password used when generating keys (if set)
+1. **How It Works:**
+   - GitHub Actions workflows use OIDC tokens for authentication
+   - Cosign signs images using ephemeral keys tied to the GitHub Actions run
+   - Signatures are stored alongside images in container registries (GHCR/ECR)
+   - Certificate includes GitHub Actions identity information
 
-3. **Signing Process:**
-   - Images are automatically signed after push to ECR
-   - Signatures are stored alongside images in ECR
-   - Both SHA-based tags and `latest` tags are signed
+2. **Signing Process:**
+   - Images are automatically signed after push to container registry
+   - Signatures are stored as OCI artifacts alongside images
+   - Works for both GHCR (GitHub Container Registry) and ECR (Amazon ECR)
+   - All images are signed: auth-service, event-service, booking-service, frontend
 
-4. **Verification Process:**
-   - Signatures are verified before deployment
-   - Failed verification logs a warning but doesn't block deployment (can be made mandatory)
+3. **Verification Process:**
+   - Signatures are verified before deployment in staging and production
+   - Verification checks:
+     - Signature exists and is valid
+     - Certificate identity matches GitHub Actions issuer
+     - Image hasn't been tampered with
+   - **Deployment is blocked if verification fails** - ensures only signed images are deployed
 
-#### Key Rotation
+4. **Workflow Integration:**
+   - **PR Workflow** (`ci-pr.yml`): Signs images after build
+   - **Main Branch** (`build.yml`): Signs images after build
+   - **Staging Deployment** (`deploy-test.yml`): Verifies signatures before pulling
+   - **Production Deployment** (`deploy.yml`): Verifies signatures before deploying
 
-**When to Rotate:**
-- Annually or as per security policy
-- If private key is compromised
-- When team members with access leave
+5. **Advantages of Keyless Signing:**
+   - No key management overhead
+   - No secrets to rotate
+   - Automatic signing in CI/CD
+   - Secure by default
+   - Audit trail via GitHub Actions
+   - No risk of key compromise
 
-**Rotation Procedure:**
+#### Manual Verification
 
-1. **Generate New Key Pair:**
-   ```bash
-   cosign generate-key-pair
-   ```
+You can manually verify image signatures:
 
-2. **Update GitHub Secrets:**
-   - Update `COSIGN_PRIVATE_KEY` with new private key
-   - Update `COSIGN_PUBLIC_KEY` with new public key
-   - Update `COSIGN_PASSWORD` if changed
+```bash
+# Verify GHCR image
+cosign verify \
+  --certificate-identity-regexp=".*" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+  ghcr.io/OWNER/REPO/auth-service:TAG
 
-3. **Re-sign Existing Images (Optional):**
-   ```bash
-   # Re-sign images with new key
-   for image in auth-service event-service booking-service frontend; do
-     cosign sign --key cosign.key $ECR_REGISTRY/$image:latest
-   done
-   ```
+# Verify ECR image
+cosign verify \
+  --certificate-identity-regexp=".*" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+  ACCOUNT.dkr.ecr.REGION.amazonaws.com/auth-service:TAG
+```
 
-4. **Update Verification:**
-   - Update `COSIGN_PUBLIC_KEY` in GitHub Secrets
-   - New deployments will use new key for signing and verification
+#### Migration from Key-Based Signing
 
-5. **Archive Old Keys:**
-   - Store old keys securely for historical verification
-   - Mark as rotated/expired in key management system
+If you previously used key-based signing and want to migrate:
 
-**Note**: Old images signed with previous keys will still be verifiable with old public key if needed for audit purposes.
+1. **Old images** signed with keys will remain verifiable with the old public key
+2. **New images** will use keyless signing automatically
+3. **No action required** - the migration is automatic
+4. For historical verification, keep the old public key available
 
 ## Cluster and Node Security
 
@@ -349,7 +355,7 @@ Network policies enforce least-privilege communication:
 - [x] Secrets not in Git
 - [x] TLS for external traffic
 - [x] Image scanning enabled
-- [x] Image signing enabled (cosign)
+- [x] Image signing enabled (Cosign keyless signing)
 - [x] Control plane logging enabled
 - [x] GuardDuty enabled
 - [x] Security Hub enabled
@@ -361,13 +367,13 @@ Network policies enforce least-privilege communication:
 
 ## Future Security Enhancements
 
-- [x] Image signing with cosign
+- [x] Image signing with cosign (keyless signing)
+- [x] Mandatory signature verification (blocks deployment if verification fails)
 - [ ] Service Mesh (mTLS between services)
 - [ ] Automated secret rotation
 - [ ] WAF on ALB
 - [ ] OPA Gatekeeper for policy enforcement
 - [ ] Falco for runtime security
-- [ ] Mandatory signature verification (currently optional)
 - [ ] Regular penetration testing
 - [ ] Security training for team
 
