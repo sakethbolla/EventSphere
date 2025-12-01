@@ -212,15 +212,11 @@ jobs:
           
           echo "All image signatures verified successfully"
 
+      - name: Install Kyverno CLI
+        uses: kyverno/action-install-cli@v0.2.0
+
       - name: Validate Kubernetes manifests with Kyverno
         run: |
-          echo "Installing Kyverno CLI..."
-          curl -LO "https://github.com/kyverno/kyverno/releases/latest/download/kyverno-cli-linux-amd64.tar.gz"
-          tar -xzf kyverno-cli-linux-amd64.tar.gz
-          chmod +x kyverno
-          sudo mv kyverno /usr/local/bin/
-          kyverno version
-          
           echo "Validating Kubernetes manifests with Kyverno policies..."
           
           # Validate all generated manifests against policies

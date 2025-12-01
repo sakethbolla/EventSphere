@@ -34,14 +34,22 @@ RUN rm -f /etc/nginx/conf.d/default.conf
 # Copy nginx configuration
 COPY --chown=nginx:nginx nginx.conf /etc/nginx/conf.d/default.conf
 
+# Set NET_BIND_SERVICE capability on nginx binary for non-root port 80 binding
+# In Alpine, libcap package includes both library and binaries (setcap, getcap)
+# The capability is set on the binary AND granted by Kubernetes securityContext
+RUN apk add --no-cache libcap && \
+    setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx && \
+    # Verify capability was set
+    getcap /usr/sbin/nginx && \
+    # Keep libcap for verification (it's small ~50KB)
+    echo "Capability set successfully"
+
 # Create health check script
 RUN echo '#!/bin/sh' > /usr/local/bin/healthcheck.sh && \
     echo 'wget --quiet --tries=1 --spider http://localhost/ || exit 1' >> /usr/local/bin/healthcheck.sh && \
     chmod +x /usr/local/bin/healthcheck.sh && \
     chown nginx:nginx /usr/local/bin/healthcheck.sh
 
-# Note: nginx needs to run as root to bind to port 80
-# In Kubernetes, we can use non-root with securityContext, but for Docker we keep root
 # Expose port
 EXPOSE 80
 
@@ -50,4 +58,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
 
 # Start nginx
+# The NET_BIND_SERVICE capability is set on the binary AND granted by Kubernetes
 CMD ["nginx", "-g", "daemon off;"]

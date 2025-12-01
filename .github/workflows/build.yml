@@ -155,6 +155,34 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
+      - name: Verify NET_BIND_SERVICE capability in frontend image
+        run: |
+          IMAGE_TAG="${{ steps.set-tag.outputs.tag }}"
+          IMAGE_PREFIX="${{ steps.image-prefix.outputs.prefix }}"
+          FRONTEND_IMAGE="${{ env.GHCR_REGISTRY }}/${IMAGE_PREFIX}/frontend:${IMAGE_TAG}"
+
+          echo "Verifying NET_BIND_SERVICE capability in built image: ${FRONTEND_IMAGE}"
+          echo "This verifies the capability was set during the Docker build process."
+
+          # Pull the image if not already available
+          docker pull "${FRONTEND_IMAGE}" || echo "Image already available"
+
+          # Check if capability is set on nginx binary
+          CAP_OUTPUT=$(docker run --rm --platform linux/amd64 --entrypoint sh "${FRONTEND_IMAGE}" -c "getcap /usr/sbin/nginx" 2>&1)
+
+          echo "Capability check output:"
+          echo "${CAP_OUTPUT}"
+
+          if echo "${CAP_OUTPUT}" | grep -q "cap_net_bind_service"; then
+            echo "SUCCESS: NET_BIND_SERVICE capability is set on nginx binary in the image"
+            echo "Expected output: /usr/sbin/nginx = cap_net_bind_service+ep"
+          else
+            echo "WARNING: NET_BIND_SERVICE capability NOT found on nginx binary!"
+            echo "This could be the root cause of the permission denied error."
+            echo "The capability may not have been set during the Docker build."
+            exit 1
+          fi
+
       - name: Run Trivy vulnerability scanner on auth-service
         if: github.event.inputs.skip_scan != 'true'
         continue-on-error: true
