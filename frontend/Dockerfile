@@ -35,10 +35,12 @@ RUN rm -f /etc/nginx/conf.d/default.conf
 COPY --chown=nginx:nginx nginx.conf /etc/nginx/conf.d/default.conf
 
 # Set NET_BIND_SERVICE capability on nginx binary for non-root port 80 binding
-# This allows nginx to bind to port 80 as non-root user when NET_BIND_SERVICE capability is granted
-RUN apk add --no-cache libcap && \
+# Keep libcap-bin (minimal ~50KB) to ensure capability support is available
+# The capability is set on the binary AND granted by Kubernetes securityContext
+RUN apk add --no-cache libcap libcap-bin && \
     setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx && \
-    apk del libcap
+    # Verify capability was set
+    getcap /usr/sbin/nginx
 
 # Create health check script
 RUN echo '#!/bin/sh' > /usr/local/bin/healthcheck.sh && \
@@ -54,4 +56,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
 
 # Start nginx
+# The NET_BIND_SERVICE capability is set on the binary AND granted by Kubernetes
 CMD ["nginx", "-g", "daemon off;"]
