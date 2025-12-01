@@ -160,6 +160,8 @@ securityContext:
 
 ### Container Security Context
 
+All containers follow the principle of least privilege:
+
 ```yaml
 securityContext:
   allowPrivilegeEscalation: false
@@ -168,6 +170,23 @@ securityContext:
     drop:
     - ALL
 ```
+
+**Exception for Frontend Service:**
+
+The frontend (nginx) requires the `NET_BIND_SERVICE` capability to bind to port 80 as a non-root user:
+
+```yaml
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+    - ALL
+    add:
+    - NET_BIND_SERVICE  # Allows non-root binding to port 80
+```
+
+This is a minimal, well-scoped capability that only grants permission to bind to privileged ports (< 1024) without requiring root privileges. This follows Kubernetes security best practices for running nginx as non-root while maintaining port 80 for compatibility with ingress configurations.
 
 ### Resource Limits
 

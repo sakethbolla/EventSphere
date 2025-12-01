@@ -200,6 +200,7 @@ All services have HPA configured based on:
 - **Non-root**: All containers run as non-root users
 - **Read-only**: Frontend uses read-only root filesystem
 - **Capabilities**: All unnecessary capabilities dropped
+  - **Exception**: Frontend requires `NET_BIND_SERVICE` capability to bind to port 80 as non-root (see SECURITY.md for details)
 
 ### Secrets Management
 
