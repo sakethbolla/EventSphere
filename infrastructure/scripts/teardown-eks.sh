@@ -93,8 +93,20 @@ LAMBDA_POLICY="eventsphere-lambda-ses-send-policy"
 LAMBDA_POLICY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/${LAMBDA_POLICY}"
 
 if aws iam get-role --role-name $LAMBDA_ROLE &> /dev/null; then
-    # Detach policy
-    aws iam detach-role-policy --role-name $LAMBDA_ROLE --policy-arn $LAMBDA_POLICY_ARN 2>/dev/null || true
+    # Detach all managed policies
+    ATTACHED_POLICIES=$(aws iam list-attached-role-policies --role-name $LAMBDA_ROLE --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null)
+    for POLICY_ARN in $ATTACHED_POLICIES; do
+        aws iam detach-role-policy --role-name $LAMBDA_ROLE --policy-arn $POLICY_ARN 2>/dev/null || true
+        echo -e "${GREEN}✅ Detached policy: ${POLICY_ARN}${NC}"
+    done
+    
+    # Delete all inline policies
+    INLINE_POLICIES=$(aws iam list-role-policies --role-name $LAMBDA_ROLE --query 'PolicyNames[]' --output text 2>/dev/null)
+    for POLICY_NAME in $INLINE_POLICIES; do
+        aws iam delete-role-policy --role-name $LAMBDA_ROLE --policy-name $POLICY_NAME 2>/dev/null || true
+        echo -e "${GREEN}✅ Deleted inline policy: ${POLICY_NAME}${NC}"
+    done
+    
     # Delete role
     aws iam delete-role --role-name $LAMBDA_ROLE
     echo -e "${GREEN}✅ IAM role deleted: $LAMBDA_ROLE${NC}"
@@ -107,6 +119,40 @@ if aws iam get-policy --policy-arn $LAMBDA_POLICY_ARN &> /dev/null; then
     echo -e "${GREEN}✅ IAM policy deleted: $LAMBDA_POLICY${NC}"
 else
     echo -e "${YELLOW}⚠️  IAM policy not found: $LAMBDA_POLICY${NC}"
+fi
+
+# Notification service role
+NOTIFICATION_ROLE="eventsphere-notification-service-role"
+NOTIFICATION_POLICY="eventsphere-notification-sns-publish-policy"
+NOTIFICATION_POLICY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/${NOTIFICATION_POLICY}"
+
+if aws iam get-role --role-name $NOTIFICATION_ROLE &> /dev/null; then
+    # Detach all managed policies
+    ATTACHED_POLICIES=$(aws iam list-attached-role-policies --role-name $NOTIFICATION_ROLE --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null)
+    for POLICY_ARN in $ATTACHED_POLICIES; do
+        aws iam detach-role-policy --role-name $NOTIFICATION_ROLE --policy-arn $POLICY_ARN 2>/dev/null || true
+        echo -e "${GREEN}✅ Detached policy: ${POLICY_ARN}${NC}"
+    done
+    
+    # Delete all inline policies
+    INLINE_POLICIES=$(aws iam list-role-policies --role-name $NOTIFICATION_ROLE --query 'PolicyNames[]' --output text 2>/dev/null)
+    for POLICY_NAME in $INLINE_POLICIES; do
+        aws iam delete-role-policy --role-name $NOTIFICATION_ROLE --policy-name $POLICY_NAME 2>/dev/null || true
+        echo -e "${GREEN}✅ Deleted inline policy: ${POLICY_NAME}${NC}"
+    done
+    
+    # Delete role
+    aws iam delete-role --role-name $NOTIFICATION_ROLE
+    echo -e "${GREEN}✅ IAM role deleted: $NOTIFICATION_ROLE${NC}"
+else
+    echo -e "${YELLOW}⚠️  IAM role not found: $NOTIFICATION_ROLE${NC}"
+fi
+
+if aws iam get-policy --policy-arn $NOTIFICATION_POLICY_ARN &> /dev/null; then
+    aws iam delete-policy --policy-arn $NOTIFICATION_POLICY_ARN
+    echo -e "${GREEN}✅ IAM policy deleted: $NOTIFICATION_POLICY${NC}"
+else
+    echo -e "${YELLOW}⚠️  IAM policy not found: $NOTIFICATION_POLICY${NC}"
 fi
 echo ""
 
@@ -121,8 +167,31 @@ else
 fi
 echo ""
 
-# Step 5: Delete EKS cluster
-echo -e "${BLUE}🗑️  Step 5: Deleting EKS cluster...${NC}"
+# Step 5: Delete OIDC provider
+echo -e "${BLUE}🗑️  Step 5: Deleting OIDC provider...${NC}"
+if eksctl get cluster --name $CLUSTER_NAME --region $REGION &> /dev/null; then
+    # Get OIDC provider ID from cluster
+    OIDC_ID=$(aws eks describe-cluster --name $CLUSTER_NAME --region $REGION --query "cluster.identity.oidc.issuer" --output text 2>/dev/null | cut -d '/' -f 5)
+    
+    if [ -n "$OIDC_ID" ]; then
+        OIDC_PROVIDER_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/oidc.eks.${REGION}.amazonaws.com/id/${OIDC_ID}"
+        
+        if aws iam get-open-id-connect-provider --open-id-connect-provider-arn $OIDC_PROVIDER_ARN &> /dev/null; then
+            aws iam delete-open-id-connect-provider --open-id-connect-provider-arn $OIDC_PROVIDER_ARN
+            echo -e "${GREEN}✅ OIDC provider deleted: ${OIDC_ID}${NC}"
+        else
+            echo -e "${YELLOW}⚠️  OIDC provider not found${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Could not retrieve OIDC ID from cluster${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️  Cluster not found, skipping OIDC provider deletion${NC}"
+fi
+echo ""
+
+# Step 6: Delete EKS cluster
+echo -e "${BLUE}🗑️  Step 6: Deleting EKS cluster...${NC}"
 if eksctl get cluster --name $CLUSTER_NAME --region $REGION &> /dev/null; then
     eksctl delete cluster --name $CLUSTER_NAME --region $REGION
     echo -e "${GREEN}✅ Cluster deletion initiated${NC}"

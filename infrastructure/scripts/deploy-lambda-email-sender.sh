@@ -57,22 +57,30 @@ read -p "Enter the email address to use as sender (e.g., your-email@gmail.com): 
 
 echo -e "${YELLOW}Verifying email in SES...${NC}"
 
-# Check if email is already verified using the newer API
-VERIFICATION_STATUS=$(aws ses get-identity-verification-attributes \
+# Extract domain from email
+DOMAIN=$(echo "$FROM_EMAIL" | cut -d'@' -f2)
+
+# Check if email or domain is verified
+EMAIL_VERIFICATION=$(aws ses get-identity-verification-attributes \
     --identities "$FROM_EMAIL" \
     --region $AWS_REGION \
-    --query "VerificationAttributes.\"$FROM_EMAIL\".VerificationStatus" \
-    --output text 2>/dev/null || echo "NotFound")
+    --output json 2>/dev/null | grep -o '"VerificationStatus": *"[^"]*"' | head -1 | cut -d'"' -f4 || echo "NotFound")
 
-if [ "$VERIFICATION_STATUS" = "Success" ]; then
-    echo -e "${GREEN}✅ Email already verified: $FROM_EMAIL${NC}"
+DOMAIN_VERIFICATION=$(aws ses get-identity-verification-attributes \
+    --identities "$DOMAIN" \
+    --region $AWS_REGION \
+    --output json 2>/dev/null | grep -o '"VerificationStatus": *"[^"]*"' | head -1 | cut -d'"' -f4 || echo "NotFound")
+
+if [ "$EMAIL_VERIFICATION" = "Success" ]; then
+    echo -e "${GREEN}✅ Email verified: $FROM_EMAIL${NC}"
+elif [ "$DOMAIN_VERIFICATION" = "Success" ]; then
+    echo -e "${GREEN}✅ Domain verified: $DOMAIN (can send from $FROM_EMAIL)${NC}"
 else
-    echo -e "${YELLOW}Email not verified. Sending verification email...${NC}"
-    aws ses verify-email-identity --email-address "$FROM_EMAIL" --region $AWS_REGION
-    echo -e "${GREEN}✅ Verification email sent to $FROM_EMAIL${NC}"
-    echo -e "${YELLOW}⚠️  Please check your inbox and click the verification link${NC}"
+    echo -e "${YELLOW}⚠️  Neither email nor domain is verified in SES${NC}"
+    echo -e "${YELLOW}If you have verified the domain, you can proceed.${NC}"
+    echo -e "${YELLOW}Otherwise, please verify the email or domain in SES first.${NC}"
     echo ""
-    read -p "Press Enter after you've verified the email..."
+    read -p "Press Enter to continue anyway, or Ctrl+C to cancel..."
 fi
 echo ""
 
@@ -232,7 +240,7 @@ if aws lambda get-function --function-name $FUNCTION_NAME --region $AWS_REGION &
     
     aws lambda update-function-configuration \
         --function-name $FUNCTION_NAME \
-        --environment "Variables={FROM_EMAIL=$FROM_EMAIL}" \
+        --environment Variables="{FROM_EMAIL=$FROM_EMAIL}" \
         --region $AWS_REGION > /dev/null
     
     echo -e "${GREEN}✅ Lambda function updated${NC}"
@@ -246,7 +254,7 @@ else
         --zip-file fileb://function.zip \
         --timeout 30 \
         --memory-size 256 \
-        --environment "Variables={FROM_EMAIL=$FROM_EMAIL}" \
+        --environment Variables="{FROM_EMAIL=$FROM_EMAIL}" \
         --region $AWS_REGION > /dev/null
     
     echo -e "${GREEN}✅ Lambda function created${NC}"
