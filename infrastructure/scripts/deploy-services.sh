@@ -785,9 +785,17 @@ if [ "$SKIP_MONITORING" != "true" ]; then
         
         # Deploy monitoring ingress if template was processed
         if [ -f "$PROJECT_ROOT/monitoring/generated/ingress.yaml" ]; then
-            echo -e "${BLUE}🌐 Deploying monitoring ingress...${NC}"
+            echo -e "${BLUE}🌐 Deploying Grafana ingress...${NC}"
             kubectl apply -f "$PROJECT_ROOT/monitoring/generated/ingress.yaml"
-            echo -e "${GREEN}✅ Monitoring ingress deployed${NC}"
+            echo -e "${GREEN}✅ Grafana ingress deployed${NC}"
+            echo ""
+        fi
+        
+        # Deploy Prometheus ingress if template was processed
+        if [ -f "$PROJECT_ROOT/monitoring/generated/prometheus-ingress.yaml" ]; then
+            echo -e "${BLUE}🌐 Deploying Prometheus ingress...${NC}"
+            kubectl apply -f "$PROJECT_ROOT/monitoring/generated/prometheus-ingress.yaml"
+            echo -e "${GREEN}✅ Prometheus ingress deployed${NC}"
             echo ""
         fi
         
@@ -842,8 +850,17 @@ echo "     │  Username: admin               │"
 echo "     │  Password: EventSphere2024     │"
 echo "     └────────────────────────────────┘"
 echo ""
-echo "  📈 Prometheus: kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090"
-echo "                 http://localhost:9090"
+echo "  📈 Prometheus (Metrics & Queries):"
+echo "     Local:  kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090"
+echo "             http://localhost:9090"
+if [ -f "$PROJECT_ROOT/monitoring/generated/prometheus-ingress.yaml" ]; then
+    echo "     Public: https://prometheus.enpm818rgroup7.work.gd (requires DNS setup)"
+fi
+echo ""
+echo "     ┌────────────────────────────────┐"
+echo "     │  Authentication: None          │"
+echo "     │  (Public access - no password) │"
+echo "     └────────────────────────────────┘"
 echo ""
 echo "  ☁️  CloudWatch Logs: /aws/eks/$CLUSTER_NAME/application"
 echo ""

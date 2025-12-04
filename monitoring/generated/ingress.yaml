@@ -1,0 +1,38 @@
+# Ingress for Monitoring Services (Grafana)
+# This exposes Grafana at: https://monitoring.enpm818rgroup7.work.gd
+#
+# IMPORTANT: You need to add a DNS record for monitoring.enpm818rgroup7.work.gd
+# pointing to the same ALB as your main application.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitoring-ingress
+  namespace: monitoring
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    # Use the same certificate as your main app (must cover *.enpm818rgroup7.work.gd or monitoring.enpm818rgroup7.work.gd)
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:277707118728:certificate/2ab5f4c8-842c-447b-842f-b741fbdb2126
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health
+    alb.ingress.kubernetes.io/group.name: eventsphere  # Share ALB with main app
+    alb.ingress.kubernetes.io/tags: Environment=production,Project=EventSphere
+  labels:
+    app: monitoring
+spec:
+  ingressClassName: alb
+  rules:
+    # Grafana
+    - host: monitoring.enpm818rgroup7.work.gd
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus-grafana
+                port:
+                  number: 80
+

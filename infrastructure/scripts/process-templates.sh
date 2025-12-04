@@ -203,6 +203,16 @@ if [ -f "$PROJECT_ROOT/monitoring/ingress.yaml.template" ]; then
         "$PROJECT_ROOT/monitoring/generated/ingress.yaml"
 fi
 
+if [ -f "$PROJECT_ROOT/monitoring/prometheus-ingress.yaml.template" ]; then
+    process_template "$PROJECT_ROOT/monitoring/prometheus-ingress.yaml.template" \
+        "$PROJECT_ROOT/monitoring/generated/prometheus-ingress.yaml"
+fi
+
+if [ -f "$PROJECT_ROOT/monitoring/prometheus-ingress.yaml.template" ]; then
+    process_template "$PROJECT_ROOT/monitoring/prometheus-ingress.yaml.template" \
+        "$PROJECT_ROOT/monitoring/generated/prometheus-ingress.yaml"
+fi
+
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}✅ Template processing completed!${NC}"
