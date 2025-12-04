@@ -220,13 +220,18 @@ deploy_grafana_dashboards() {
 create_cloudwatch_log_groups() {
     print_status "Creating CloudWatch Log Groups..."
     
+    # Define log group names (use variables to avoid Git Bash path conversion on Windows)
+    APP_LOG_GROUP="/aws/eks/${CLUSTER_NAME}/application"
+    DATAPLANE_LOG_GROUP="/aws/eks/${CLUSTER_NAME}/dataplane"
+    
     # Application logs
-    aws logs create-log-group --log-group-name /aws/eks/$CLUSTER_NAME/application --region $AWS_REGION 2>/dev/null || true
-    aws logs put-retention-policy --log-group-name /aws/eks/$CLUSTER_NAME/application --retention-in-days 30 --region $AWS_REGION
+    # MSYS_NO_PATHCONV=1 prevents Git Bash on Windows from converting /aws/... paths
+    MSYS_NO_PATHCONV=1 aws logs create-log-group --log-group-name "$APP_LOG_GROUP" --region $AWS_REGION 2>/dev/null || true
+    MSYS_NO_PATHCONV=1 aws logs put-retention-policy --log-group-name "$APP_LOG_GROUP" --retention-in-days 30 --region $AWS_REGION
     
     # Dataplane logs
-    aws logs create-log-group --log-group-name /aws/eks/$CLUSTER_NAME/dataplane --region $AWS_REGION 2>/dev/null || true
-    aws logs put-retention-policy --log-group-name /aws/eks/$CLUSTER_NAME/dataplane --retention-in-days 14 --region $AWS_REGION
+    MSYS_NO_PATHCONV=1 aws logs create-log-group --log-group-name "$DATAPLANE_LOG_GROUP" --region $AWS_REGION 2>/dev/null || true
+    MSYS_NO_PATHCONV=1 aws logs put-retention-policy --log-group-name "$DATAPLANE_LOG_GROUP" --retention-in-days 14 --region $AWS_REGION
     
     print_success "CloudWatch Log Groups created/updated."
 }
