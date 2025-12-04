@@ -190,9 +190,17 @@ if [ -f "$PROJECT_ROOT/k8s/overlays/staging/kustomization.yaml.template" ]; then
 fi
 
 # Process monitoring templates
+echo -e "${BLUE}🔄 Processing monitoring templates...${NC}"
+mkdir -p "$PROJECT_ROOT/monitoring/generated"
+
 if [ -f "$PROJECT_ROOT/monitoring/cloudwatch/fluent-bit-config.yaml.template" ]; then
     process_template "$PROJECT_ROOT/monitoring/cloudwatch/fluent-bit-config.yaml.template" \
         "$PROJECT_ROOT/monitoring/cloudwatch/generated/fluent-bit-config.yaml"
+fi
+
+if [ -f "$PROJECT_ROOT/monitoring/ingress.yaml.template" ]; then
+    process_template "$PROJECT_ROOT/monitoring/ingress.yaml.template" \
+        "$PROJECT_ROOT/monitoring/generated/ingress.yaml"
 fi
 
 echo ""

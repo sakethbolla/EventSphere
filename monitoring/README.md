@@ -13,10 +13,19 @@ Simple, reliable observability stack for EventSphere.
 
 ## Quick Start
 
+Observability is deployed automatically with the main deployment:
+
 ```bash
-cd infrastructure/scripts
-chmod +x deploy-observability.sh
-./deploy-observability.sh
+cd infrastructure
+./scripts/setup-eks.sh           # 1. Create EKS cluster
+./scripts/build-and-push-images.sh  # 2. Build & push images
+./scripts/process-templates.sh   # 3. Process templates (including monitoring)
+./scripts/deploy-services.sh     # 4. Deploy everything (including observability)
+```
+
+To skip monitoring deployment:
+```bash
+./scripts/deploy-services.sh --skip-monitoring
 ```
 
 ## Access Dashboards
