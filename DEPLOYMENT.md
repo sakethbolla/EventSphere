@@ -260,20 +260,42 @@ cp config.env.example config.env
 Edit `config.env` and set your values:
 
 ```bash
-# Required: AWS Account ID (leave empty to auto-detect from AWS CLI)
-export AWS_ACCOUNT_ID="123456789012"
+# AWS Configuration
+# Leave empty to auto-detect from AWS CLI (recommended if AWS CLI is configured)
+export AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-}"
 
 # AWS Region
-export AWS_REGION="us-east-1"
+export AWS_REGION="${AWS_REGION:-us-east-1}"
 
 # ACM Certificate ARN for HTTPS/TLS
-export ACM_CERTIFICATE_ARN="arn:aws:acm:us-east-1:123456789012:certificate/abc123..."
+# Get this from: aws acm list-certificates --region us-east-1
+export ACM_CERTIFICATE_ARN="${ACM_CERTIFICATE_ARN:-arn:aws:acm:us-east-1:YOUR_ACCOUNT_ID:certificate/...}"
 
 # Cluster name
-export CLUSTER_NAME="eventsphere-cluster"
+export CLUSTER_NAME="${CLUSTER_NAME:-eventsphere-cluster}"
 ```
 
-**Note**: `ECR_REGISTRY` and IAM role ARNs are automatically calculated from `AWS_ACCOUNT_ID` and `AWS_REGION` if not explicitly set.
+**Important Configuration Notes:**
+
+1. **AWS_ACCOUNT_ID Auto-Detection**:
+   - If `AWS_ACCOUNT_ID` is left empty (default), the `process-templates.sh` script will automatically detect it using `aws sts get-caller-identity`
+   - This requires AWS CLI to be installed and configured with valid credentials
+   - If auto-detection fails, you must manually set `AWS_ACCOUNT_ID`
+
+2. **ECR_REGISTRY Calculation**:
+   - `ECR_REGISTRY` is automatically calculated as `${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com`
+   - This happens **after** `AWS_ACCOUNT_ID` is detected/set, ensuring the registry URL includes the account ID
+   - The script automatically fixes invalid `ECR_REGISTRY` values (e.g., `.dkr.ecr.us-east-1.amazonaws.com`)
+
+3. **IAM Role ARNs**:
+   - Automatically calculated from `AWS_ACCOUNT_ID` if not explicitly set:
+     - `FLUENT_BIT_ROLE_ARN`: `arn:aws:iam::${AWS_ACCOUNT_ID}:role/fluent-bit-role`
+     - `EXTERNAL_SECRETS_ROLE_ARN`: `arn:aws:iam::${AWS_ACCOUNT_ID}:role/external-secrets-role`
+
+4. **ACM Certificate ARN**:
+   - Required for HTTPS/TLS termination on the ALB
+   - Find your certificate ARN: `aws acm list-certificates --region us-east-1`
+   - The certificate must be in the same region as your EKS cluster
 
 ### 5.2 Process Templates (Recommended)
 
@@ -288,9 +310,60 @@ chmod +x process-templates.sh
 The script will:
 - Load configuration from `infrastructure/config/config.env`
 - Auto-detect AWS Account ID from AWS CLI if not set in config
+- **Fix invalid ECR_REGISTRY values** if detected (prevents InvalidImageName errors)
 - Process all `.template` files using environment variable substitution
 - Generate processed files in `k8s/generated/` directory
 - Copy non-template files to the generated directory
+
+**Verification After Processing:**
+
+Always verify the output configuration:
+
+```bash
+# Check the script output shows correct values:
+# ✅ Detected AWS Account ID: 123456789012
+# ECR_REGISTRY: 123456789012.dkr.ecr.us-east-1.amazonaws.com
+```
+
+Then verify generated manifests:
+
+```bash
+# Check image references in generated deployments
+grep -r "image:" k8s/generated/base/*.yaml
+
+# Should show valid image URLs with account ID:
+# image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/auth-service:latest
+
+# If you see invalid URLs like:
+# image: .dkr.ecr.us-east-1.amazonaws.com/auth-service:latest
+# Then AWS_ACCOUNT_ID was not set correctly
+```
+
+**Troubleshooting Template Processing:**
+
+If you encounter issues:
+
+1. **Invalid ECR_REGISTRY in output**:
+   ```bash
+   # Verify AWS CLI is configured
+   aws sts get-caller-identity
+   
+   # If that fails, manually set AWS_ACCOUNT_ID in config.env
+   export AWS_ACCOUNT_ID="123456789012"
+   ```
+
+2. **ECR_REGISTRY shows as `.dkr.ecr...`**:
+   - The script should auto-fix this, but if it doesn't:
+   - Manually set `AWS_ACCOUNT_ID` in `config.env`
+   - Remove any manually set `ECR_REGISTRY` line (let it auto-calculate)
+   - Re-run `process-templates.sh`
+
+3. **Template processing fails**:
+   ```bash
+   # Ensure envsubst is installed
+   # macOS: brew install gettext
+   # Linux: sudo apt-get install gettext-base
+   ```
 
 **Generated files structure:**
 ```
@@ -787,6 +860,41 @@ curl https://api.enpm818rgroup7.work.gd/api/events
 
 3. Verify IAM roles for nodes have ECR read permissions
 
+4. **Common Issue: InvalidImageName Error**:
+   
+   If pods show `InvalidImageName` error with image like `.dkr.ecr.us-east-1.amazonaws.com/service:latest`:
+   
+   **Root Cause**: The deployment manifest has an invalid ECR registry URL missing the AWS Account ID.
+   
+   **Diagnosis**:
+   ```bash
+   # Check deployment image reference
+   kubectl get deployment auth-service -n prod -o yaml | grep image:
+   
+   # If it shows: image: .dkr.ecr.us-east-1.amazonaws.com/auth-service:latest
+   # Then the template was processed incorrectly
+   ```
+   
+   **Solution**:
+   ```bash
+   # 1. Verify config.env has AWS_ACCOUNT_ID set or AWS CLI configured
+   cat infrastructure/config/config.env | grep AWS_ACCOUNT_ID
+   
+   # 2. Re-process templates
+   cd infrastructure/scripts
+   ./process-templates.sh
+   
+   # 3. Verify generated manifests have correct image URLs
+   grep "image:" k8s/generated/base/auth-service-deployment.yaml
+   # Should show: image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/auth-service:latest
+   
+   # 4. Re-apply deployment
+   kubectl apply -f k8s/generated/base/auth-service-deployment.yaml -n prod
+   
+   # 5. Verify pod is now starting correctly
+   kubectl get pods -n prod -l app=auth-service
+   ```
+
 ## Cleanup
 
 To tear down the entire cluster:
@@ -799,12 +907,4 @@ chmod +x teardown-eks.sh
 
 **Warning**: This will delete the entire cluster and all resources!
 
-## Next Steps
-
-1. Set up CI/CD pipelines (GitHub Actions)
-2. Configure monitoring alerts
-3. Set up backup procedures
-4. Review and update security policies
-5. Configure custom domains
-6. Set up staging environment
 

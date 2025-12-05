@@ -394,17 +394,154 @@ EventSphere is designed for production deployment on AWS EKS with full observabi
    cd infrastructure/scripts
    ./setup-eks.sh
    ```
-3. **Deploy Services**: Follow the deployment guide in [DEPLOYMENT.md](DEPLOYMENT.md)
+3. **Configure Environment**: Set up `infrastructure/config/config.env` (see [Configuration](#configuration) below)
+4. **Deploy Services**: Follow the deployment guide in [DEPLOYMENT.md](DEPLOYMENT.md)
+
+### Configuration
+
+Before deploying, you must configure `infrastructure/config/config.env`:
+
+```bash
+cd infrastructure/config
+cp config.env.example config.env
+```
+
+Edit `config.env` with your values:
+
+```bash
+# AWS Configuration
+# Leave empty to auto-detect from AWS CLI (recommended)
+export AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-}"
+
+# AWS Region
+export AWS_REGION="${AWS_REGION:-us-east-1}"
+
+# ACM Certificate ARN for HTTPS/TLS
+# Get this from: aws acm list-certificates --region us-east-1
+export ACM_CERTIFICATE_ARN="${ACM_CERTIFICATE_ARN:-arn:aws:acm:us-east-1:YOUR_ACCOUNT_ID:certificate/...}"
+
+# Cluster Configuration
+export CLUSTER_NAME="${CLUSTER_NAME:-eventsphere-cluster}"
+```
+
+**Important Notes:**
+- **AWS_ACCOUNT_ID**: If left empty, the `process-templates.sh` script will auto-detect it from your AWS CLI credentials
+- **ECR_REGISTRY**: Automatically calculated as `${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com` after AWS_ACCOUNT_ID is set
+- **IAM Role ARNs**: Automatically calculated from AWS_ACCOUNT_ID if not explicitly set
+- If you manually set `AWS_ACCOUNT_ID`, ensure it matches your actual AWS account ID
+
+### Common Configuration Issues
+
+**Issue: InvalidImageName error with `.dkr.ecr.us-east-1.amazonaws.com`**
+
+If you see pod errors like:
+```
+Failed to apply default image tag ".dkr.ecr.us-east-1.amazonaws.com/auth-service:latest": 
+couldn't parse image name: invalid reference format
+```
+
+**Root Cause**: `ECR_REGISTRY` was set before `AWS_ACCOUNT_ID` was detected, resulting in an invalid registry URL missing the account ID.
+
+**Solution**:
+1. Verify your `config.env` file doesn't have an incorrectly set `ECR_REGISTRY`
+2. Ensure `AWS_ACCOUNT_ID` is either set explicitly or AWS CLI is configured for auto-detection
+3. Re-run `process-templates.sh` - the script now automatically fixes invalid `ECR_REGISTRY` values
+4. Verify the output shows a valid `ECR_REGISTRY`:
+   ```bash
+   ./scripts/process-templates.sh
+   # Should show: ECR_REGISTRY: 123456789012.dkr.ecr.us-east-1.amazonaws.com
+   ```
+5. If the issue persists, manually set `AWS_ACCOUNT_ID` in `config.env`:
+   ```bash
+   export AWS_ACCOUNT_ID="123456789012"
+   ```
+
+**Verification Steps After Configuration**:
+
+After running `process-templates.sh`, verify the generated manifests:
+
+```bash
+# Check that ECR_REGISTRY is valid in generated deployments
+grep -r "image:" k8s/generated/base/*.yaml
+
+# Should show images like:
+# image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/auth-service:latest
+# NOT: image: .dkr.ecr.us-east-1.amazonaws.com/auth-service:latest
+```
 
 ### Key Features
 
 - **Infrastructure**: EKS cluster with 3+ nodes across 2+ availability zones
 - **Load Balancing**: AWS ALB with HTTPS/TLS termination
 - **Auto-scaling**: HPA for pods, Cluster Autoscaler for nodes
-- **Monitoring**: Prometheus, Grafana, and CloudWatch integration
+- **Observability**: Prometheus, Grafana, CloudWatch Logs, and AlertManager (see [Observability](#observability) below)
 - **Security**: GuardDuty, Security Hub, Network Policies, Pod Security Standards
 - **CI/CD**: GitHub Actions workflows for security scanning, automated builds (GHCR), and EKS deployments
 - **Secrets Management**: External Secrets Operator with AWS Secrets Manager
+
+### Observability
+
+EventSphere includes a comprehensive observability stack for monitoring, logging, and alerting:
+
+#### Components
+
+| Component | Purpose | Access |
+|-----------|---------|--------|
+| **Prometheus** | Metrics collection and storage | `localhost:9090` (port-forward) |
+| **Grafana** | Metrics visualization and dashboards | `localhost:3000` (port-forward) |
+| **Fluent Bit** | Container logs to CloudWatch | AWS CloudWatch Console |
+| **AlertManager** | Alert routing and notifications | Built into Prometheus stack |
+
+#### Accessing Dashboards
+
+**Grafana**:
+```bash
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+```
+- URL: http://localhost:3000
+- Username: `admin`
+- Password: `EventSphere2024`
+- Includes EventSphere-specific dashboards for service metrics
+
+**Prometheus**:
+```bash
+kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
+```
+- URL: http://localhost:9090
+- Query metrics, view targets, and check alert status
+
+**CloudWatch Logs**:
+- Log Group: `/aws/eks/eventsphere-cluster/application`
+- View in AWS Console or via CLI:
+  ```bash
+  aws logs tail /aws/eks/eventsphere-cluster/application --follow
+  ```
+
+#### Configured Alerts
+
+| Alert | Condition | Severity |
+|-------|-----------|----------|
+| PodCrashLooping | Pod restarting frequently | Critical |
+| PodNotReady | Pod stuck in Pending/Failed | Warning |
+| HighMemoryUsage | Memory > 90% of limit | Warning |
+| HighCPUUsage | CPU > 80% of limit | Warning |
+| DeploymentReplicasMismatch | Replicas not matching desired | Warning |
+| HPAAtMaxReplicas | HPA at maximum for 15min | Warning |
+
+#### Deployment
+
+Observability is deployed automatically with the main deployment:
+```bash
+cd infrastructure/scripts
+./deploy-services.sh
+```
+
+To skip monitoring deployment:
+```bash
+./deploy-services.sh --skip-monitoring
+```
+
+For more details, see [monitoring/README.md](monitoring/README.md).
 
 ### Documentation
 
@@ -423,6 +560,7 @@ Comprehensive runbooks for operational procedures:
 - **[Deployment and Rollback](docs/runbooks/DEPLOYMENT_ROLLBACK.md)**: Deployment strategies and rollback procedures
 - **[Troubleshooting](docs/runbooks/TROUBLESHOOTING.md)**: Common issues and diagnostic procedures
 - **[Maintenance](docs/runbooks/MAINTENANCE.md)**: Regular maintenance tasks and schedules
+- **[Monitoring README](monitoring/README.md)**: Observability stack setup and usage
 - **[Alert Handling](monitoring/alertmanager/runbook.md)**: Prometheus alert response procedures
 
 ## Contributing
