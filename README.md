@@ -3,9 +3,8 @@
 EventSphere is a microservice-based event management platform. The repository contains the backend services, a React frontend, and shared application code.
 <img width="2557" height="1266" alt="image" src="https://github.com/user-attachments/assets/2879f378-bc57-4968-a198-7bd4bf08bcbf" />
 
-
-
 ## Features
+
 - User authentication with JWT-based sessions
 - Event browsing, search, and category filtering
 - Ticket booking workflow with simulated payments
@@ -14,7 +13,9 @@ EventSphere is a microservice-based event management platform. The repository co
 - Email notifications via AWS SNS for user registration and booking confirmations
 
 ## Service Overview
+
 The system is composed of the following independently running services:
+
 - **Auth Service** (port 4001) – manages user accounts and tokens
 - **Event Service** (port 4002) – handles CRUD operations for events
 - **Booking Service** (port 4003) – coordinates ticket reservations
@@ -26,6 +27,7 @@ All services communicate over HTTP and store data in MongoDB. Ensure that a Mong
 > Note: Ready-to-use `.env` files are committed with non-sensitive development defaults (local MongoDB URLs, service ports, and JWT secret). You can start the stack immediately and tailor the values later if needed.
 
 ## Project Structure
+
 ```
 EventSphere/
 ├── frontend/                    # React frontend application
@@ -50,22 +52,23 @@ EventSphere/
 │   └── cloudwatch/              # CloudWatch logging
 ├── .github/                     # CI/CD workflows
 │   └── workflows/               # GitHub Actions
-│       ├── ci-pr.yml            # CI pipeline for PRs (Security Scan → Build, Push & Sign)
-│       ├── security-scan.yml    # Security scanning workflow (main branch)
-│       ├── build.yml            # Build and push Docker images (main branch)
-│       ├── deploy-test.yml      # Deploy to Staging (kind cluster)
-│       └── deploy.yml           # Deploy to Production (EKS)
+│       ├── ci.yml               # CI pipeline (Code Quality, K8s Validation, Security Scans)
+│       └── cd.yml               # CD pipeline (Build, Push, Sign, Deploy to EKS)
 └── README.md
 ```
 
 ## Getting Started
+
 ### Prerequisites
+
 - Node.js 25.1.0 or later
 - npm (ships with Node.js)
 - MongoDB running locally on the default port or accessible connection string
 
 ### Install Dependencies
+
 Install dependencies for each service and the frontend:
+
 ```bash
 cd services/auth-service; npm install
 cd ../event-service; npm install
@@ -74,8 +77,29 @@ cd ../notification-service; npm install
 cd ../../frontend; npm install
 ```
 
+### Set up Pre-commit Hooks (Recommended)
+
+Pre-commit hooks automatically lint and format your code before commits:
+
+```bash
+# Install pre-commit (requires Python)
+pip install pre-commit
+# or
+brew install pre-commit  # macOS
+
+# Install the git hooks
+pre-commit install
+
+# Test the hooks (optional)
+pre-commit run --all-files
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
+
 ### Run the Backend Services
+
 Each backend service exposes an npm script for development mode with automatic reloads. Run each one in a separate terminal window:
+
 ```bash
 cd services/auth-service; npm run dev
 cd services/event-service; npm run dev
@@ -86,19 +110,23 @@ cd services/notification-service; npm run dev
 **Note:** The notification service requires AWS SNS configuration. See [Notification Service Setup](#notification-service-setup) below.
 
 ### Run the Frontend
+
 ```bash
 cd frontend
 npm start
 ```
+
 The React development server will proxy API requests to the backend services when they are running on the ports listed above.
 
 ## Using EventSphere
 
 ### Account types and sign-in flow
+
 - **Attendee accounts** are created through the public registration form available from the navbar. Newly registered users default to the `user` role and can browse events, reserve seats, and review their bookings.
 - **Administrator accounts** can create, edit, and delete events. Because the public registration screen hides administrative privileges, you must explicitly set the `role` field when creating an admin profile.
 
 ### Creating an administrator
+
 1. Start the authentication service and connect to the MongoDB instance defined in `services/auth-service/.env`.
 2. Issue a POST request directly to the auth-service endpoint and include `"role": "admin"` in the payload. Example using `curl` while the auth service is running on port 4001:
    ```bash
@@ -116,42 +144,50 @@ The React development server will proxy API requests to the backend services whe
 > Note: Already registered users can also be promoted by updating the `role` field to `admin` directly in MongoDB.
 
 ### Managing events as an admin
+
 1. Log in with an administrator account. The navbar reveals a **Manage Events** link that routes to `/admin/events`.
 2. Use the **Create Event** button to open the event form. Fill in title, description, category, venue, date, time, capacity, price, organizer, and an optional image URL.
 3. Submit the form to persist the event through the event-service (`POST /api/events`). A success toast appears and the events table refreshes with the new entry.
 4. Use the table's **Delete** button to remove events (`DELETE /api/events/:id`).
 
 ### Booking events as an attendee
+
 1. Register or log in from the navbar.
 2. Browse events on the home page. Filters, search, and sorting options are available in the event list.
 3. Open an event to view details and reserve seats. Confirming a booking updates seat availability through the booking-service and event-service coordination.
 4. Access **My Bookings** from the navbar to review reservations and cancel if supported.
 
 ### Tips for operators
+
 - Event capacity and availability are enforced by the event-service middleware, so bookings will fail gracefully when seats run out.
 - All admin-only endpoints validate JWTs and roles via the auth-service. Ensure you include the `Authorization: Bearer <token>` header when calling backend APIs directly.
 
 ## Notification Service
 
 The notification service sends email notifications using **AWS SNS + Lambda + SES**:
+
 - Welcome emails when users register
 - Booking confirmation emails when users book events
 
 ### Architecture
+
 ```
 Notification Service → SNS Topic → Lambda Function → SES → User Email
 ```
 
 ### How It Works
+
 1. User registers/books event
 2. Notification service publishes to SNS
 3. Lambda function extracts user email
 4. SES sends email to specific user
 
 ### Cloud Deployment
+
 See [DEPLOYMENT_ORDER.md](DEPLOYMENT_ORDER.md) for complete deployment steps.
 
 Quick summary:
+
 ```bash
 cd infrastructure/scripts
 
@@ -174,7 +210,9 @@ cd infrastructure/scripts
 For detailed architecture and troubleshooting, see [SNS_LAMBDA_SETUP.md](SNS_LAMBDA_SETUP.md).
 
 ## Environment Configuration
+
 Each service directory and the frontend already include a committed `.env` file configured for local development. Key variables you can tweak are:
+
 - `MONGO_URI` – MongoDB connection string
 - `JWT_SECRET` – secret for signing auth tokens (auth service)
 - `PORT` – optional override for default ports listed above
@@ -185,202 +223,132 @@ Each service directory and the frontend already include a committed `.env` file 
 The frontend `.env` exposes `REACT_APP_AUTH_API_URL`, `REACT_APP_EVENT_API_URL`, and `REACT_APP_BOOKING_API_URL`. Adjust these if your backend runs on different hosts or ports.
 
 ## Testing
+
 Each service currently includes placeholder npm test scripts. Extend these as needed and run them with `npm test` from the respective service directory.
 
 ## CI/CD Pipeline
 
-EventSphere includes automated CI/CD workflows using GitHub Actions following industry-standard practices. The pipeline provides security scanning, automated builds, staging validation, and production deployment.
+EventSphere includes automated CI/CD workflows using GitHub Actions following industry-standard practices. The pipeline provides code quality checks, security scanning, Kubernetes validation, automated builds, and production deployment.
 
 ### Pipeline Flow
 
 #### On Pull Requests (Continuous Integration)
-The `ci-pr.yml` workflow runs all steps sequentially in a single workflow:
+
+The `ci.yml` workflow runs comprehensive validation checks:
+
 ```
-Security Scan → Build, Push, and Sign Images
+Code Quality → Kubernetes Validation → Docker Build & Scan → Helm Validation → Kyverno Policy Check
 ```
-- **Sequential execution**: Each step only runs after the previous one succeeds
-- **Job dependencies**: Uses `needs:` to ensure proper ordering
-- Validates code quality and security
-- Builds Docker images, pushes them to GHCR, then signs them with Cosign (keyless signing via OIDC)
-- **Fast feedback**: No deployment step - keeps PR checks quick
+
+- **Code Quality**: Runs tests and linting for all services
+- **Kubernetes Validation**: Generates manifests and validates with kube-linter and kube-score
+- **Docker Build & Scan**: Builds images and scans with Trivy for vulnerabilities
+- **Helm Validation**: Validates Helm charts
+- **Kyverno Policy Check**: Validates manifests against security policies
 - All checks must pass before PR can be merged
-- **Note**: Full deployment validation happens on main branch after merge
+- Fast feedback with parallel job execution where possible
 
 #### On Main Branch (Continuous Deployment)
-Separate workflows trigger sequentially via `workflow_run`:
+
+The `cd.yml` workflow handles deployment:
+
 ```
-Security Scan → Build → Deploy to Staging → Deploy to Production
+Build & Push Images → Deploy to EKS → Smoke Tests
 ```
-- **Sequential execution**: Each workflow triggers the next after successful completion
-- **workflow_run triggers**: Ensures proper ordering across separate workflows
-- Full validation pipeline
-- Automatic deployment to production EKS after staging succeeds
-- Production deployment only runs on main branch
+
+- **Build & Push**: Builds Docker images, pushes to ECR, signs with Cosign
+- **Deploy**: Verifies image signatures, deploys to EKS with Helm (atomic rollback enabled)
+- **Smoke Tests**: Validates deployment health
+- Automatic deployment to staging on push to main
+- Production deployment via manual workflow dispatch
 
 ### Available Workflows
 
-1. **CI Pipeline (PR)** (`ci-pr.yml`) - **For Pull Requests**
-   - **Streamlined workflow** with sequential jobs: Security Scan → Build, Push, and Sign Images
-   - Runs on pull requests targeting `main` branch
-   - **Job dependencies**: Each job uses `needs:` to wait for previous job success
-   - **Image Process**: Builds images, pushes to GHCR, then signs them with Cosign using keyless signing (OIDC)
-   - **Fast feedback**: No deployment step - keeps PR checks fast (~3-5 minutes)
-   - **Purpose**: Validate code security and build quality before merging to main
-   - **Note**: Full deployment validation happens on main branch after merge
+1. **CI Pipeline** (`ci.yml`) - **For Pull Requests and Feature Branches**
+   - Runs on pull requests and pushes to `feature/**` and `fix/**` branches
+   - **Code Quality Job**: Tests and linting for all services
+   - **Kubernetes Validation Job**:
+     - Generates Kubernetes manifests from templates
+     - Validates with kube-linter (v0.6.5)
+     - Scores with kube-score (v1.18.0)
+   - **Docker Build & Scan Job**:
+     - Builds all service images
+     - Scans with Trivy for vulnerabilities
+     - Uploads results to GitHub Security tab
+   - **Helm Validation Job**: Validates Helm charts
+   - **Kyverno Policy Check Job**:
+     - Validates generated manifests against security policies
+     - Uses Kyverno CLI (v1.12.0)
+     - Blocks deployment if policies fail
+   - **Purpose**: Comprehensive validation before code reaches main branch
 
-2. **Security Scan** (`security-scan.yml`) - **For Main Branch**
-   - **Runs first** - Must pass before build workflow runs
-   - Runs on push to `main` branch
-   - Triggers `build.yml` via `workflow_run` after successful completion
-   - Scans filesystem, Kubernetes manifests, Dockerfiles, and infrastructure
-   - Fails on critical vulnerabilities to block unsafe code
-   - Results appear in GitHub Security tab
-   - **Best Practice**: Catches security issues early, prevents building vulnerable images
-   - **Note**: RBAC files are excluded from scanning (intentionally permissive roles for class project demonstration)
+2. **CD Pipeline** (`cd.yml`) - **For Main Branch Deployment**
+   - Runs on push to `main` branch or manual workflow dispatch
+   - **Build and Push Job**:
+     - Builds Docker images for all services
+     - Pushes to Amazon ECR
+     - **Image Signing**: Images are signed with Cosign (keyless signing via OIDC)
+     - Tags images with short commit SHA
+   - **Deploy Job**:
+     - **Image Verification**: Verifies image signatures before deployment (blocks if verification fails)
+     - Installs Cosign and verifies all service images
+     - Deploys to EKS using Helm with `--atomic` flag (automatic rollback on failure)
+     - Verifies rollout status for all deployments
+   - **Smoke Tests Job**:
+     - Runs health checks on all deployed services
+     - Validates pod status
+   - **Environment Support**: Supports staging and production environments
+   - **Safety**: Only deploys if cluster exists and is active
 
-3. **Build and Push** (`build.yml`) - **For Main Branch**
-   - **Runs after security scan passes** - Only builds if code is secure
-   - Triggered by `workflow_run` from Security Scan workflow
-   - Builds Docker images for all 4 services (auth, event, booking, frontend)
-   - **Pushes images** to container registries (GHCR and optionally ECR)
-   - **Image Signing**: After push, all images are automatically signed with Cosign using keyless signing (OIDC)
-     - No key management required - uses GitHub Actions OIDC tokens
-     - Signatures stored alongside images in container registry
-   - **Dual Registry Support**:
-     - **GHCR (GitHub Container Registry)**: Always pushes - required for all deployments
-     - **ECR (Amazon ECR)**: Optional - pushes if `AWS_ROLE_ARN` secret is configured
-     - Build never fails if ECR is unavailable (graceful degradation)
-   - Tags images with commit SHA (consistent across PRs and main branch)
-   - Runs security scans on built images (Trivy)
-   - Triggers `deploy-test.yml` via `workflow_run` after successful completion
+### Key Features
 
-4. **Deploy to Staging** (`deploy-test.yml`) - **FREE, No AWS Required!**
-   - **Runs automatically after successful builds on main branch**
-   - Triggered by `workflow_run` from Build workflow
-   - **Image Verification**: Verifies image signatures before pulling (ensures images are signed)
-   - Uses kind (Kubernetes in Docker) to create temporary staging cluster
-   - Validates Kubernetes manifests, deploys services, runs health checks
-   - Tests deployment structure and service startup
-   - Automatically tears down cluster after testing
-   - **Cost: $0** - Meets CI/CD deployment requirement without AWS costs
-   - **Purpose**: Staging environment validation before production
-   - Triggers `deploy.yml` via `workflow_run` after successful completion
+- **Image Signing & Verification**: All images are signed with Cosign and verified before deployment
+- **Automatic Rollback**: Helm deployments use `--atomic` flag for automatic rollback on failure
+- **Security Validation**: Kyverno policies enforce security best practices
+- **Comprehensive Testing**: Multiple validation layers ensure code quality
+- **Fast Feedback**: Parallel job execution where possible
 
-5. **Deploy to Production** (`deploy.yml`) - **EKS Production Deployment**
-   - **Runs automatically on main branch** after staging deployment succeeds
-   - Triggered by `workflow_run` from Deploy to Staging workflow
-   - Can also be triggered manually for other environments (staging, dev)
-   - **Image Verification**: Verifies image signatures before deployment (ensures images are signed and untampered)
-   - Deploys to AWS EKS production cluster
-   - Processes Kubernetes templates, updates image tags, applies manifests
-   - Includes automatic rollback on failure
-   - **Requires AWS infrastructure** (EKS cluster)
-   - **Safety**: Only auto-deploys after staging validation passes
+### Pre-commit Hooks
 
-### Pipeline Flow Diagram
+EventSphere includes pre-commit hooks for code quality:
 
-#### Pull Request Flow (CI)
-```
-┌─────────────┐
-│  Code Push  │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│Security Scan│ ◄─── Must pass (blocks if fails)
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ Build, Push │ ◄─── Pushes to GHCR (always)
-│ & Sign      │      Then signs with Cosign
-│ commit SHA  │      (keyless signing via OIDC)
-└─────────────┘
-       │
-       └─── Fast feedback (~3-5 min)
-            No deployment step
-```
+- **yamllint**: Validates YAML files
+- **Prettier**: Formats JavaScript, JSON, YAML, Markdown, CSS
+- **ShellCheck**: Lints shell scripts
 
-#### Main Branch Flow (CD)
-```
-┌─────────────┐
-│Merge to Main│
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│Security Scan│
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ Build, Push │ ◄─── Pushes to GHCR + ECR (if configured)
-│ & Sign      │      Then signs with Cosign
-│ commit SHA  │      (keyless signing via OIDC)
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│Deploy Stage │ ◄─── Verifies signatures
-│  (kind)     │      Final validation
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│Deploy Prod  │ ◄─── Verifies signatures
-│   (EKS)     │      AUTO-DEPLOYS to EKS!
-│             │      Only if staging succeeds
-└─────────────┘
-```
-
-### Image Registry Strategy
-
-- **GHCR (GitHub Container Registry)**: 
-  - Always used - required for all deployments
-  - Free - no AWS costs
-  - Works for staging and production
-  
-- **ECR (Amazon ECR)**: 
-  - Optional - only if `AWS_ROLE_ARN` secret is configured
-  - Won't fail build if unavailable
-  - Useful for production deployments preferring ECR
-  - Requires AWS infrastructure setup
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions.
 
 ### Quick Start - CI/CD
 
 **On Pull Requests:**
+
 ```bash
-# Create a PR - the ci-pr.yml workflow runs automatically:
-# All steps run sequentially in a single workflow:
-# 1. Security Scan → validates code security (must pass)
-# 2. Build, Push & Sign → builds images, pushes to GHCR, then signs them
-#                        Images are signed with Cosign (keyless signing via OIDC)
-#                        Only runs if Security Scan succeeds
+# Create a PR - the ci.yml workflow runs automatically:
+# 1. Code Quality → tests and linting
+# 2. Kubernetes Validation → manifest validation
+# 3. Docker Build & Scan → image security scanning
+# 4. Helm Validation → chart validation
+# 5. Kyverno Policy Check → security policy validation
 # All checks must pass before PR can be merged
-# Note: Deployment validation happens on main branch after merge
 ```
 
-**On Main Branch (Automatic Production Deployment):**
+**On Main Branch (Automatic Deployment):**
+
 ```bash
-# Merge PR to main - the following runs automatically:
-# 1. Security Scan → validates code security
-# 2. Build, Push & Sign → builds images, pushes to GHCR + ECR, then signs them
-#                        Images are signed with Cosign (keyless signing via OIDC)
-# 3. Deploy to Staging → verifies signatures, final validation in kind cluster
-# 4. Deploy to Production → verifies signatures, automatic deployment to EKS
-#                          (only if staging succeeds)
+# Merge PR to main - the cd.yml workflow runs automatically:
+# 1. Build & Push → builds images, pushes to ECR, signs with Cosign
+# 2. Deploy → verifies signatures, deploys to EKS with atomic rollback
+# 3. Smoke Tests → validates deployment health
 ```
 
 **Manual Production Deployment:**
+
 ```bash
 # For other environments or manual triggers:
-# Actions tab → "Deploy to Production (EKS)" → Run workflow
-# Select environment: prod, staging, or dev
+# Actions tab → "CD" → Run workflow
+# Select environment: staging or production
 # Requires: AWS infrastructure (EKS cluster) to be provisioned first
 ```
-
-**View Your Images:**
-- Go to GitHub repo → **Packages** (right sidebar)
 
 ## Cloud Deployment (AWS EKS)
 
@@ -425,6 +393,7 @@ export CLUSTER_NAME="${CLUSTER_NAME:-eventsphere-cluster}"
 ```
 
 **Important Notes:**
+
 - **AWS_ACCOUNT_ID**: If left empty, the `process-templates.sh` script will auto-detect it from your AWS CLI credentials
 - **ECR_REGISTRY**: Automatically calculated as `${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com` after AWS_ACCOUNT_ID is set
 - **IAM Role ARNs**: Automatically calculated from AWS_ACCOUNT_ID if not explicitly set
@@ -435,14 +404,16 @@ export CLUSTER_NAME="${CLUSTER_NAME:-eventsphere-cluster}"
 **Issue: InvalidImageName error with `.dkr.ecr.us-east-1.amazonaws.com`**
 
 If you see pod errors like:
+
 ```
-Failed to apply default image tag ".dkr.ecr.us-east-1.amazonaws.com/auth-service:latest": 
+Failed to apply default image tag ".dkr.ecr.us-east-1.amazonaws.com/auth-service:latest":
 couldn't parse image name: invalid reference format
 ```
 
 **Root Cause**: `ECR_REGISTRY` was set before `AWS_ACCOUNT_ID` was detected, resulting in an invalid registry URL missing the account ID.
 
 **Solution**:
+
 1. Verify your `config.env` file doesn't have an incorrectly set `ECR_REGISTRY`
 2. Ensure `AWS_ACCOUNT_ID` is either set explicitly or AWS CLI is configured for auto-detection
 3. Re-run `process-templates.sh` - the script now automatically fixes invalid `ECR_REGISTRY` values
@@ -485,32 +456,37 @@ EventSphere includes a comprehensive observability stack for monitoring, logging
 
 #### Components
 
-| Component | Purpose | Access |
-|-----------|---------|--------|
-| **Prometheus** | Metrics collection and storage | `localhost:9090` (port-forward) |
-| **Grafana** | Metrics visualization and dashboards | `localhost:3000` (port-forward) |
-| **Fluent Bit** | Container logs to CloudWatch | AWS CloudWatch Console |
-| **AlertManager** | Alert routing and notifications | Built into Prometheus stack |
+| Component        | Purpose                              | Access                          |
+| ---------------- | ------------------------------------ | ------------------------------- |
+| **Prometheus**   | Metrics collection and storage       | `localhost:9090` (port-forward) |
+| **Grafana**      | Metrics visualization and dashboards | `localhost:3000` (port-forward) |
+| **Fluent Bit**   | Container logs to CloudWatch         | AWS CloudWatch Console          |
+| **AlertManager** | Alert routing and notifications      | Built into Prometheus stack     |
 
 #### Accessing Dashboards
 
 **Grafana**:
+
 ```bash
 kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
 ```
+
 - URL: http://localhost:3000
 - Username: `admin`
 - Password: `EventSphere2024`
 - Includes EventSphere-specific dashboards for service metrics
 
 **Prometheus**:
+
 ```bash
 kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
 ```
+
 - URL: http://localhost:9090
 - Query metrics, view targets, and check alert status
 
 **CloudWatch Logs**:
+
 - Log Group: `/aws/eks/eventsphere-cluster/application`
 - View in AWS Console or via CLI:
   ```bash
@@ -519,24 +495,26 @@ kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 909
 
 #### Configured Alerts
 
-| Alert | Condition | Severity |
-|-------|-----------|----------|
-| PodCrashLooping | Pod restarting frequently | Critical |
-| PodNotReady | Pod stuck in Pending/Failed | Warning |
-| HighMemoryUsage | Memory > 90% of limit | Warning |
-| HighCPUUsage | CPU > 80% of limit | Warning |
-| DeploymentReplicasMismatch | Replicas not matching desired | Warning |
-| HPAAtMaxReplicas | HPA at maximum for 15min | Warning |
+| Alert                      | Condition                     | Severity |
+| -------------------------- | ----------------------------- | -------- |
+| PodCrashLooping            | Pod restarting frequently     | Critical |
+| PodNotReady                | Pod stuck in Pending/Failed   | Warning  |
+| HighMemoryUsage            | Memory > 90% of limit         | Warning  |
+| HighCPUUsage               | CPU > 80% of limit            | Warning  |
+| DeploymentReplicasMismatch | Replicas not matching desired | Warning  |
+| HPAAtMaxReplicas           | HPA at maximum for 15min      | Warning  |
 
 #### Deployment
 
 Observability is deployed automatically with the main deployment:
+
 ```bash
 cd infrastructure/scripts
 ./deploy-services.sh
 ```
 
 To skip monitoring deployment:
+
 ```bash
 ./deploy-services.sh --skip-monitoring
 ```

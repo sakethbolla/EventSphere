@@ -122,7 +122,7 @@ If you previously used key-based signing and want to migrate:
 ### IAM Roles for Service Accounts (IRSA)
 
 - **Purpose**: Least-privilege access to AWS services
-- **Implementation**: 
+- **Implementation**:
   - Notification Service: Access to SNS
   - External Secrets: Access to Secrets Manager
   - Fluent Bit: Access to CloudWatch Logs
@@ -149,10 +149,11 @@ If you previously used key-based signing and want to migrate:
 ### Security Context
 
 All pods include:
+
 ```yaml
 securityContext:
   runAsNonRoot: true
-  runAsUser: 1001  # or 101 for nginx
+  runAsUser: 1001 # or 101 for nginx
   fsGroup: 1001
   seccompProfile:
     type: RuntimeDefault
@@ -165,11 +166,26 @@ All containers follow the principle of least privilege:
 ```yaml
 securityContext:
   allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true  # Frontend only
+  readOnlyRootFilesystem: true # All services
   capabilities:
     drop:
-    - ALL
+      - ALL
+  volumeMounts:
+    - name: tmp
+      mountPath: /tmp
+volumes:
+  - name: tmp
+    emptyDir: {}
 ```
+
+**Read-Only Root Filesystem:**
+
+All services now use read-only root filesystem for enhanced security:
+
+- **All Services**: `readOnlyRootFilesystem: true` is enforced
+- **Temporary Storage**: `/tmp` volume mounts using `emptyDir` for writable temporary directories
+- **Benefits**: Prevents malicious code from modifying filesystem, reduces attack surface
+- **Enforcement**: Kyverno policies validate this configuration before deployment
 
 **Exception for Frontend Service:**
 
@@ -181,9 +197,9 @@ securityContext:
   readOnlyRootFilesystem: true
   capabilities:
     drop:
-    - ALL
+      - ALL
     add:
-    - NET_BIND_SERVICE  # Allows non-root binding to port 80
+      - NET_BIND_SERVICE # Allows non-root binding to port 80
 ```
 
 This is a minimal, well-scoped capability that only grants permission to bind to privileged ports (< 1024) without requiring root privileges. This follows Kubernetes security best practices for running nginx as non-root while maintaining port 80 for compatibility with ingress configurations.
@@ -205,19 +221,29 @@ This is a minimal, well-scoped capability that only grants permission to bind to
 Kubernetes manifests are validated against security policies using Kyverno before deployment:
 
 - **Location**: `k8s/security/kyverno-policies.yaml`
-- **Enforcement**: Policies are enforced in CI/CD pipeline before `kubectl apply`
+- **Enforcement**: Policies are enforced in CI/CD pipeline before deployment
+- **CI Integration**: Kyverno validation runs as a dedicated job in the CI pipeline
 - **Policies Enforced**:
   - Non-root user requirement (enforced)
   - Resource limits requirement (enforced)
   - Privilege escalation disabled (enforced)
-  - Read-only root filesystem (audit mode)
-  - Capability restrictions (audit mode)
+  - Read-only root filesystem (enforced)
+  - Capability restrictions (enforced)
 
 **Validation Process:**
-1. Kyverno CLI is installed in deployment workflows
-2. All generated manifests are validated against policies
-3. Deployment is blocked if validation fails
-4. Only compliant manifests proceed to deployment
+
+1. **CI Pipeline**: Kyverno CLI (v1.12.0) is installed in the `kyverno-policy-check` job
+2. **Manifest Generation**: Kubernetes manifests are generated from templates
+3. **Policy Validation**: All generated manifests are validated against Kyverno policies
+4. **Failure Handling**: Deployment is blocked if validation fails
+5. **Compliance**: Only compliant manifests proceed to deployment
+
+**Benefits:**
+
+- Catches security misconfigurations early in the development cycle
+- Prevents insecure deployments from reaching production
+- Provides detailed feedback on policy violations
+- Integrates seamlessly with CI/CD pipeline
 
 ## Network Security
 
@@ -331,20 +357,24 @@ Network policies enforce least-privilege communication:
 
 ### Pipeline Security
 
-1. **Build Stage**: 
+1. **Build Stage**:
    - Trivy scans all images
    - Blocks deployment on CRITICAL vulnerabilities
    - Reports uploaded to GitHub Security
 
 2. **Deploy Stage**:
-   - **Kyverno Policy Validation**: Validates Kubernetes manifests against security policies before deployment
+   - **Image Signature Verification**: Verifies image signatures with Cosign before deployment
+     - Blocks deployment if verification fails
+     - Ensures only signed, untampered images are deployed
+   - **Helm Atomic Deployments**: Uses `--atomic` flag for automatic rollback on failure
+   - **Kyverno Policy Validation**: Validates Kubernetes manifests against security policies (in CI pipeline)
      - Enforces non-root containers
      - Validates resource limits
      - Checks privilege escalation settings
-     - Verifies security context configurations
+     - Verifies read-only root filesystem
+     - Validates security context configurations
    - Validates Kubernetes manifests
    - Checks for security misconfigurations
-   - Automatic rollback on failure
 
 3. **Security Scan Stage**:
    - Filesystem scans
@@ -391,7 +421,7 @@ Network policies enforce least-privilege communication:
 ## Security Best Practices Checklist
 
 - [x] Non-root containers
-- [x] Read-only root filesystems (where possible)
+- [x] Read-only root filesystems (all services with /tmp mounts)
 - [x] Resource limits defined
 - [x] Health checks configured
 - [x] Network policies enforced
@@ -399,6 +429,7 @@ Network policies enforce least-privilege communication:
 - [x] TLS for external traffic
 - [x] Image scanning enabled
 - [x] Image signing enabled (Cosign keyless signing)
+- [x] Image signature verification enforced
 - [x] Control plane logging enabled
 - [x] GuardDuty enabled
 - [x] Security Hub enabled
@@ -407,12 +438,18 @@ Network policies enforce least-privilege communication:
 - [x] Least-privilege IAM policies
 - [x] Encrypted volumes
 - [x] Regular security scans
+- [x] Kyverno policy validation in CI/CD
+- [x] Helm atomic deployments with automatic rollback
+- [x] Pre-commit hooks for code quality
 
 ## Future Security Enhancements
 
 - [x] Image signing with cosign (keyless signing)
 - [x] Mandatory signature verification (blocks deployment if verification fails)
 - [x] Kyverno policy validation in CI/CD pipeline
+- [x] Read-only root filesystem for all services
+- [x] Helm atomic deployments with automatic rollback
+- [x] Pre-commit hooks for code quality and security
 - [ ] Service Mesh (mTLS between services)
 - [ ] Automated secret rotation
 - [ ] WAF on ALB
@@ -424,6 +461,7 @@ Network policies enforce least-privilege communication:
 ## Security Contacts
 
 For security issues, please contact:
+
 - Security Team: security@enpm818rgroup7.work.gd
 - DevOps Team: devops@enpm818rgroup7.work.gd
 
@@ -433,4 +471,3 @@ For security issues, please contact:
 - [AWS EKS Security Best Practices](https://aws.github.io/aws-eks-best-practices/security/)
 - [CIS Kubernetes Benchmark](https://www.cisecurity.org/benchmark/kubernetes)
 - [OWASP Container Security](https://owasp.org/www-project-container-security/)
-

@@ -57,7 +57,7 @@ EventSphere is a cloud-native microservices application deployed on AWS EKS (Ela
 ### VPC Configuration
 
 - **CIDR**: 10.0.0.0/16
-- **Subnets**: 
+- **Subnets**:
   - Public subnets in each AZ for ALB
   - Private subnets in each AZ for worker nodes
 - **NAT Gateway**: Highly Available (one per AZ)
@@ -80,36 +80,41 @@ EventSphere is a cloud-native microservices application deployed on AWS EKS (Ela
 
 - **EBS CSI Driver**: For persistent volumes (MongoDB)
 - **EFS CSI Driver**: Available for shared storage if needed
-- **Storage Classes**: 
+- **Storage Classes**:
   - `mongodb-ebs`: GP3 encrypted volumes with retention policy
 
 ## Microservices
 
 ### 1. Frontend Service
+
 - **Technology**: React with Nginx
 - **Port**: 80
 - **Replicas**: 2 (HPA: 2-8)
 - **Purpose**: User interface for event management
 
 ### 2. Auth Service
+
 - **Technology**: Node.js/Express
 - **Port**: 4001
 - **Replicas**: 2 (HPA: 2-10)
 - **Purpose**: User authentication and authorization (JWT)
 
 ### 3. Event Service
+
 - **Technology**: Node.js/Express
 - **Port**: 4002
 - **Replicas**: 2 (HPA: 2-10)
 - **Purpose**: Event CRUD operations
 
 ### 4. Booking Service
+
 - **Technology**: Node.js/Express
 - **Port**: 4003
 - **Replicas**: 2 (HPA: 2-10)
 - **Purpose**: Ticket booking and reservation management
 
 ### 5. MongoDB
+
 - **Technology**: MongoDB 7.0
 - **Port**: 27017
 - **Replicas**: 1 (StatefulSet)
@@ -129,6 +134,7 @@ EventSphere is a cloud-native microservices application deployed on AWS EKS (Ela
 ### Network Policies
 
 Network policies enforce least-privilege communication:
+
 - Frontend can only communicate with backend services
 - Backend services can only communicate with MongoDB and required services
 - MongoDB only accepts connections from backend services
@@ -141,7 +147,7 @@ Network policies enforce least-privilege communication:
 - **Scheme**: HTTPS (port 443) with HTTP redirect
 - **SSL Certificate**: AWS Certificate Manager (ACM)
 - **Health Checks**: Configured for all services
-- **Path-based Routing**: 
+- **Path-based Routing**:
   - `/` → Frontend
   - `/api/auth/*` → Auth Service
   - `/api/events/*` → Event Service
@@ -152,6 +158,7 @@ Network policies enforce least-privilege communication:
 ### Horizontal Pod Autoscaling (HPA)
 
 All services have HPA configured based on:
+
 - CPU utilization (target: 70%)
 - Memory utilization (target: 80%)
 - Min replicas: 2
@@ -175,7 +182,7 @@ All services have HPA configured based on:
 
 - **Purpose**: Metrics visualization and dashboards
 - **Storage**: 10Gi persistent volume
-- **Dashboards**: 
+- **Dashboards**:
   - EventSphere Overview
   - Kubernetes Cluster Metrics
 
@@ -198,9 +205,10 @@ All services have HPA configured based on:
 
 - **Standards**: Restricted baseline enforced
 - **Non-root**: All containers run as non-root users
-- **Read-only**: Frontend uses read-only root filesystem
+- **Read-only**: All services use read-only root filesystem with `/tmp` volume mounts where needed
 - **Capabilities**: All unnecessary capabilities dropped
   - **Exception**: Frontend requires `NET_BIND_SERVICE` capability to bind to port 80 as non-root (see SECURITY.md for details)
+- **Policy Validation**: Kyverno policies validate security configurations before deployment
 
 ### Secrets Management
 
@@ -227,49 +235,49 @@ All services have HPA configured based on:
 
 ### GitHub Actions Workflows
 
-**Execution Order:** Security Scan → Build → Deploy Test
+**CI Workflow (`ci.yml`):** Code Quality → Kubernetes Validation → Docker Build & Scan → Helm Validation → Kyverno Policy Check
 
-1. **Security Scan Workflow** (`security-scan.yml`) - **Runs First**
-   - Runs on every push and pull request to main branch
-   - **Path filtered** - Skips when only documentation files (*.md) change
-   - Filesystem scans with Trivy (scans source code, excludes *.md files)
-   - Kubernetes manifest and Dockerfile scans with Trivy
-   - Infrastructure scans with Checkov (CloudFormation, Terraform, Kubernetes)
-   - Fails on critical vulnerabilities (fail-fast principle)
-   - Uploads results to GitHub Security tab
-   - **Must pass before build workflow runs**
-   - **Note**: RBAC files (`k8s/base/rbac.yaml`) are excluded from scanning
-     - These roles are intentionally permissive for class project demonstration
-     - They demonstrate RBAC concepts (admin, developer, operator roles)
-     - In production, these should follow principle of least privilege
+**CD Workflow (`cd.yml`):** Build & Push → Deploy to EKS → Smoke Tests
 
-2. **Build Workflow** (`build.yml`) - **Runs After Security Scan**
-   - Builds Docker images for all services (auth, event, booking, frontend)
-   - Runs Trivy security scans on all built images
-   - Pushes to GitHub Container Registry (GHCR) - free, no AWS required
-   - **Always runs when security scan passes** (no path filtering)
-   - Runs automatically after security scan passes
+1. **CI Pipeline** (`ci.yml`) - **For Pull Requests and Feature Branches**
+   - Runs on pull requests and pushes to `feature/**` and `fix/**` branches
+   - **Code Quality Job**:
+     - Runs tests for all services (auth, event, booking, frontend)
+     - Lints code with ESLint
+     - Builds frontend to verify compilation
+   - **Kubernetes Validation Job**:
+     - Generates Kubernetes manifests from templates
+     - Validates with kube-linter (v0.6.5) for best practices
+     - Scores with kube-score (v1.18.0) for security and reliability
+   - **Docker Build & Scan Job**:
+     - Builds Docker images for all services
+     - Scans images with Trivy for vulnerabilities
+     - Uploads scan results to GitHub Security tab
+   - **Helm Validation Job**:
+     - Validates Helm charts for syntax and best practices
+   - **Kyverno Policy Check Job**:
+     - Validates generated manifests against security policies
+     - Uses Kyverno CLI (v1.12.0)
+     - Enforces security policies (non-root, resource limits, etc.)
+     - Blocks deployment if validation fails
 
-3. **Test Deployment Workflow** (`deploy-test.yml`) - **Primary CI/CD Deployment**
-   - Automatically runs after successful builds
-   - Uses kind (Kubernetes in Docker) to create temporary cluster
-   - Pulls images from GHCR and loads into kind cluster
-   - Processes Kubernetes templates
-   - Deploys all services to kind cluster
-   - Validates deployments and runs health checks
-   - Automatically tears down cluster after testing
-   - **Cost: $0** - No AWS required
-
-4. **Production Deploy Workflow** (`deploy.yml` - Manual Only)
-   - Manual trigger only (not in automatic pipeline)
-   - For production EKS deployment demonstration
-   - Processes Kubernetes templates with AWS-specific variables
-   - Supports both GHCR and ECR image registries
-   - Deploys to EKS cluster
-   - Updates image tags and applies manifests
-   - Waits for deployments to be ready
-   - Automatic rollback on failure
-   - **Requires AWS infrastructure** (EKS cluster)
+2. **CD Pipeline** (`cd.yml`) - **For Main Branch Deployment**
+   - Runs on push to `main` branch or manual workflow dispatch
+   - **Build and Push Job**:
+     - Builds Docker images for all services
+     - Pushes to Amazon ECR
+     - **Image Signing**: Images are automatically signed with Cosign (keyless signing via OIDC)
+   - **Deploy Job**:
+     - **Image Verification**: Verifies image signatures before deployment
+     - Installs Cosign and verifies all service images
+     - Blocks deployment if signature verification fails
+     - Deploys to EKS using Helm with `--atomic` flag
+     - **Automatic Rollback**: Helm deployments automatically rollback on failure
+     - Verifies rollout status for all deployments
+   - **Smoke Tests Job**:
+     - Runs health checks on all deployed services
+     - Validates pod status and service endpoints
+   - **Environment Support**: Supports staging and production environments
 
 ## Data Flow
 
@@ -320,7 +328,3 @@ All services have HPA configured based on:
 - Redis cache for session management
 - CDN for frontend static assets
 - Database read replicas for improved performance
-
-
-
-

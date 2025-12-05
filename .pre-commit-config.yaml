@@ -1,0 +1,22 @@
+repos:
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        args: [-c=.yamllint.yaml, --format=parsable]
+        exclude: ^(k8s/.*\.template|.*\.yaml\.template|.*generated.*|helm/.*/templates/.*)
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        types_or: [javascript, jsx, json, yaml, markdown, css, scss]
+        exclude: ^(.*\.template|.*generated.*|package-lock\.json|.*\.min\.js)
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        args: [-e, SC1091, -e, SC2086, -e, SC2181, -e, SC2034, -e, SC2162, -e, SC2046, -e, SC2155]
+        files: \.(sh|bash)$
+        exclude: ^(node_modules/|.*\.min\.sh)

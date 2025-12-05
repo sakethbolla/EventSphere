@@ -29,6 +29,7 @@ This guide provides step-by-step instructions for deploying EventSphere to AWS E
 ### AWS Account Setup
 
 1. Configure AWS credentials:
+
    ```bash
    aws configure
    ```
@@ -38,10 +39,10 @@ This guide provides step-by-step instructions for deploying EventSphere to AWS E
    aws sts get-caller-identity
    ```
 
-
 ## Step 0: Easy deploy
 
 Run the following scripts to setup EKS, build and push images, deploy services and ingress:
+
 ```bash
 cd infrastructure
 ./scripts/setup-eks.sh
@@ -49,6 +50,7 @@ cd infrastructure
 ./scripts/process-templates.sh
 ./scripts/deploy-services.sh
 ```
+
 After getting ALB address, update DNS records so the domain points to ALB
 
 ## Step 1: Create EKS Cluster
@@ -56,6 +58,7 @@ After getting ALB address, update DNS records so the domain points to ALB
 ### 1.1 Review Cluster Configuration
 
 Review and update `infrastructure/eksctl-cluster.yaml`:
+
 - Update region if needed
 - Adjust node instance types if needed
 - Update tags
@@ -69,6 +72,7 @@ chmod +x scripts/setup-eks.sh
 ```
 
 This script will:
+
 - Create the EKS cluster
 - Set up node groups
 - Install required add-ons (ALB Controller, Cluster Autoscaler, etc.)
@@ -83,7 +87,7 @@ kubectl get nodes -o wide
 
 You should see at least 3 nodes across multiple availability zones.
 
-## Step 2: Image Signing (Automatic)
+## Step 2: Image Signing and Verification (Automatic)
 
 ### 2.1 Automatic Keyless Signing
 
@@ -97,14 +101,15 @@ EventSphere uses **keyless signing** with Cosign, which means:
 ### How It Works
 
 1. **Automatic Signing:**
-   - Images are built, pushed to container registries, then automatically signed in CI/CD pipelines
+   - Images are built, pushed to ECR, then automatically signed in CI/CD pipeline
    - Uses Cosign v2.2.1 with GitHub Actions OIDC authentication
-   - Signatures stored alongside images in container registries (GHCR/ECR)
+   - Signatures stored alongside images in ECR
 
 2. **Automatic Verification:**
-   - Signatures are verified before deployment in staging and production
-   - Deployment is blocked if signature verification fails
+   - Signatures are verified before deployment in the CD pipeline
+   - **Deployment is blocked if signature verification fails**
    - Ensures only signed, untampered images are deployed
+   - Verification happens automatically in the deploy job
 
 3. **No Manual Steps Required:**
    - No keys to generate or manage
@@ -125,11 +130,10 @@ wget https://github.com/sigstore/cosign/releases/download/v2.2.1/cosign-linux-am
 sudo mv cosign-linux-amd64 /usr/local/bin/cosign
 sudo chmod +x /usr/local/bin/cosign
 
-# Verify GHCR image
-cosign verify \
-  --certificate-identity-regexp=".*" \
-  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/OWNER/REPO/auth-service:TAG
+# Login to ECR
+aws ecr get-login-password --region us-east-1 | \
+  docker login --username AWS --password-stdin \
+  ACCOUNT.dkr.ecr.REGION.amazonaws.com
 
 # Verify ECR image
 cosign verify \
@@ -180,6 +184,7 @@ chmod +x build-and-push-images.sh
 ```
 
 The script will:
+
 - Create ECR repositories if they don't exist (with image scanning and encryption)
 - Log into ECR automatically
 - Build Docker images for all services (auth-service, event-service, booking-service, frontend)
@@ -187,6 +192,7 @@ The script will:
 - Push all images to ECR
 
 **Options:**
+
 ```bash
 # Use custom tag
 ./build-and-push-images.sh --tag v1.0.0
@@ -205,6 +211,7 @@ The script will:
 ```
 
 **Environment Variables:**
+
 - `AWS_REGION` - AWS region (default: us-east-1)
 - `IMAGE_TAG` - Image tag (default: latest)
 - `SKIP_BUILD` - Skip building (default: false)
@@ -242,7 +249,7 @@ for service in auth-service event-service booking-service frontend; do
 done
 ```
 
-**Note**: In production, use GitHub Actions workflows for automated builds.
+**Note**: In production, use GitHub Actions workflows for automated builds, signing, and deployment with automatic rollback.
 
 ## Step 5: Process Configuration Templates
 
@@ -308,6 +315,7 @@ chmod +x process-templates.sh
 ```
 
 The script will:
+
 - Load configuration from `infrastructure/config/config.env`
 - Auto-detect AWS Account ID from AWS CLI if not set in config
 - **Fix invalid ECR_REGISTRY values** if detected (prevents InvalidImageName errors)
@@ -344,10 +352,11 @@ grep -r "image:" k8s/generated/base/*.yaml
 If you encounter issues:
 
 1. **Invalid ECR_REGISTRY in output**:
+
    ```bash
    # Verify AWS CLI is configured
    aws sts get-caller-identity
-   
+
    # If that fails, manually set AWS_ACCOUNT_ID in config.env
    export AWS_ACCOUNT_ID="123456789012"
    ```
@@ -366,6 +375,7 @@ If you encounter issues:
    ```
 
 **Generated files structure:**
+
 ```
 k8s/generated/
 ├── base/
@@ -415,12 +425,14 @@ chmod +x deploy-services.sh
 ```
 
 This script will:
+
 - Create secrets in AWS Secrets Manager (with auto-generated secure passwords)
 - Create IAM roles for service accounts
 - Deploy MongoDB
 - Deploy all microservices
 
 **Options:**
+
 ```bash
 # Skip specific steps
 ./deploy-services.sh --skip-secrets    # Skip AWS Secrets Manager
@@ -473,6 +485,7 @@ chmod +x create-iam-roles.sh
 ```
 
 This script creates:
+
 - Fluent Bit Role (CloudWatch Logs access)
 - External Secrets Operator Role (Secrets Manager access)
 
@@ -503,6 +516,7 @@ kubectl annotate serviceaccount external-secrets -n external-secrets-system \
 ### 8.1 Automated Deployment (Recommended)
 
 The `deploy-services.sh` script (Step 6.1) automatically deploys MongoDB. It will:
+
 - Create namespaces
 - Create storage class
 - Create Kubernetes secrets (or use External Secrets)
@@ -548,6 +562,7 @@ Wait for MongoDB pod to be in `Running` state.
 ### 9.1 Automated Deployment (Recommended)
 
 The `deploy-services.sh` script (Step 6.1) automatically deploys all microservices. It will:
+
 - Verify templates are processed
 - Apply ConfigMaps
 - Apply RBAC
@@ -555,6 +570,8 @@ The `deploy-services.sh` script (Step 6.1) automatically deploys all microservic
 - Apply HPA configurations
 - Wait for deployments to be ready
 - Verify all pods are running
+
+**Note**: For production deployments via CI/CD, Helm is used with `--atomic` flag for automatic rollback on failure.
 
 ### 9.2 Manual Deployment
 
@@ -588,7 +605,6 @@ kubectl get services -n prod
 
 All pods should be in `Running` state and services should have endpoints.
 
-
 ### 9.4 Verify RBAC Configuration
 
 The RBAC configuration provides least-privilege access control across all environments.
@@ -613,6 +629,7 @@ kubectl auth can-i get secret/mongodb-secret \
 ```
 
 **RBAC Features:**
+
 - Service accounts for all microservices (dev, staging, prod)
 - Least-privilege roles for each service
 - User roles: Developer (read-only prod), Operator (full access), Admin
@@ -656,6 +673,7 @@ Note the ADDRESS field - this is your ALB DNS name.
 ### 10.5 Update DNS
 
 Create DNS records pointing to the ALB:
+
 - `enpm818rgroup7.work.gd` → ALB address
 - `api.enpm818rgroup7.work.gd` → ALB address
 
@@ -763,41 +781,45 @@ curl https://api.enpm818rgroup7.work.gd/api/events
 ### EKS Cluster Creation Issues
 
 1. **eksctl cluster creation fails:**
+
    ```bash
    # Check eksctl version
    eksctl version
-   
+
    # Verify AWS credentials
    aws sts get-caller-identity
-   
+
    # Check for existing cluster
    eksctl get cluster --region us-east-1
-   
+
    # Review cluster configuration
    cat infrastructure/eksctl-cluster.yaml
    ```
 
 2. **Node groups not scaling:**
+
    ```bash
    # Check Cluster Autoscaler logs
    kubectl logs -n kube-system deployment/cluster-autoscaler
-   
+
    # Verify node group configuration
    eksctl get nodegroup --cluster eventsphere-cluster --region us-east-1
    ```
 
 3. **OIDC provider not found:**
+
    ```bash
    # Create OIDC provider manually
    eksctl utils associate-iam-oidc-provider --cluster eventsphere-cluster --region us-east-1 --approve
    ```
 
 4. **VPC/subnet issues:**
+
    ```bash
    # Check VPC configuration
    aws eks describe-cluster --name eventsphere-cluster --region us-east-1 \
      --query 'cluster.resourcesVpcConfig'
-   
+
    # Verify subnets exist
    aws ec2 describe-subnets --filters "Name=tag:Name,Values=*eventsphere*" --region us-east-1
    ```
@@ -805,11 +827,13 @@ curl https://api.enpm818rgroup7.work.gd/api/events
 ### Pods Not Starting
 
 1. Check pod logs:
+
    ```bash
    kubectl logs -n prod <pod-name>
    ```
 
 2. Check pod events:
+
    ```bash
    kubectl describe pod -n prod <pod-name>
    ```
@@ -822,11 +846,13 @@ curl https://api.enpm818rgroup7.work.gd/api/events
 ### Services Not Accessible
 
 1. Check service endpoints:
+
    ```bash
    kubectl get endpoints -n prod
    ```
 
 2. Check ingress:
+
    ```bash
    kubectl describe ingress -n prod
    ```
@@ -836,6 +862,7 @@ curl https://api.enpm818rgroup7.work.gd/api/events
 ### MongoDB Connection Issues
 
 1. Check MongoDB pod:
+
    ```bash
    kubectl get pods -n prod -l app=mongodb
    kubectl logs -n prod -l app=mongodb
@@ -849,11 +876,13 @@ curl https://api.enpm818rgroup7.work.gd/api/events
 ### Image Pull Errors
 
 1. Verify ECR access:
+
    ```bash
    aws ecr describe-repositories
    ```
 
 2. Check image pull secrets:
+
    ```bash
    kubectl get secrets -n prod
    ```
@@ -861,36 +890,38 @@ curl https://api.enpm818rgroup7.work.gd/api/events
 3. Verify IAM roles for nodes have ECR read permissions
 
 4. **Common Issue: InvalidImageName Error**:
-   
+
    If pods show `InvalidImageName` error with image like `.dkr.ecr.us-east-1.amazonaws.com/service:latest`:
-   
+
    **Root Cause**: The deployment manifest has an invalid ECR registry URL missing the AWS Account ID.
-   
+
    **Diagnosis**:
+
    ```bash
    # Check deployment image reference
    kubectl get deployment auth-service -n prod -o yaml | grep image:
-   
+
    # If it shows: image: .dkr.ecr.us-east-1.amazonaws.com/auth-service:latest
    # Then the template was processed incorrectly
    ```
-   
+
    **Solution**:
+
    ```bash
    # 1. Verify config.env has AWS_ACCOUNT_ID set or AWS CLI configured
    cat infrastructure/config/config.env | grep AWS_ACCOUNT_ID
-   
+
    # 2. Re-process templates
    cd infrastructure/scripts
    ./process-templates.sh
-   
+
    # 3. Verify generated manifests have correct image URLs
    grep "image:" k8s/generated/base/auth-service-deployment.yaml
    # Should show: image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/auth-service:latest
-   
+
    # 4. Re-apply deployment
    kubectl apply -f k8s/generated/base/auth-service-deployment.yaml -n prod
-   
+
    # 5. Verify pod is now starting correctly
    kubectl get pods -n prod -l app=auth-service
    ```
@@ -906,5 +937,3 @@ chmod +x teardown-eks.sh
 ```
 
 **Warning**: This will delete the entire cluster and all resources!
-
-

@@ -1,0 +1,13 @@
+# Prettier ignore patterns
+node_modules/
+build/
+dist/
+*.min.js
+*.min.css
+package-lock.json
+*.template
+generated/
+coverage/
+.git/
+.vscode/
+.idea/
