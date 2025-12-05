@@ -235,7 +235,6 @@ jobs:
       - name: Install Kyverno CLI
         uses: kyverno/action-install-cli@v0.2.0
         with:
-          # Pin a CLI version if you want; omit "release" to use the action default
           release: 'v1.12.0'
 
       - name: Show Kyverno version
