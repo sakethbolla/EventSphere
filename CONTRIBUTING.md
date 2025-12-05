@@ -22,32 +22,50 @@ Thank you for your interest in contributing to EventSphere! This document provid
 ### Development Setup
 
 1. **Fork and Clone**
+
    ```bash
    git clone https://github.com/your-username/EventSphere.git
    cd EventSphere
    ```
 
 2. **Install Dependencies**
+
    ```bash
    # Backend services
    cd services/auth-service && npm install && cd ../..
    cd services/event-service && npm install && cd ../..
    cd services/booking-service && npm install && cd ../..
-   
+
    # Frontend
    cd frontend && npm install && cd ..
    ```
 
-3. **Start Local Development**
+3. **Set up Pre-commit Hooks** (Recommended)
+
+   ```bash
+   # Install pre-commit (requires Python)
+   pip install pre-commit
+   # or
+   brew install pre-commit  # macOS
+
+   # Install the git hooks
+   pre-commit install
+
+   # Test the hooks (optional)
+   pre-commit run --all-files
+   ```
+
+4. **Start Local Development**
+
    ```bash
    # Start MongoDB
    docker-compose -f docker-compose.dev.yml up -d
-   
+
    # Start services (in separate terminals)
    cd services/auth-service && npm run dev
    cd services/event-service && npm run dev
    cd services/booking-service && npm run dev
-   
+
    # Start frontend
    cd frontend && npm start
    ```
@@ -60,9 +78,9 @@ We use a **trunk-based development** approach:
 
 - **main**: Production-ready code
 - **develop**: Integration branch for features
-- **feature/***: Feature branches
-- **bugfix/***: Bug fix branches
-- **hotfix/***: Critical production fixes
+- **feature/\***: Feature branches
+- **bugfix/\***: Bug fix branches
+- **hotfix/\***: Critical production fixes
 
 ### Branch Naming
 
@@ -84,6 +102,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 
 **Types**:
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation
@@ -93,6 +112,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 - `chore`: Maintenance tasks
 
 **Examples**:
+
 ```
 feat(auth): add JWT token refresh endpoint
 
@@ -105,15 +125,21 @@ docs(deployment): update EKS setup instructions
 
 ### Before Submitting
 
-1. **Update Documentation**: Update relevant documentation
-2. **Add Tests**: Add tests for new features or bug fixes
-3. **Run Linters**: Ensure code passes linting
-4. **Test Locally**: Verify changes work in local environment
-5. **Update CHANGELOG**: Document changes (if applicable)
+1. **Run Pre-commit Hooks**: Pre-commit hooks will run automatically on `git commit`
+   ```bash
+   # Or run manually before committing
+   pre-commit run --all-files
+   ```
+2. **Update Documentation**: Update relevant documentation
+3. **Add Tests**: Add tests for new features or bug fixes
+4. **Run Linters**: Ensure code passes linting (handled by pre-commit)
+5. **Test Locally**: Verify changes work in local environment
+6. **Update CHANGELOG**: Document changes (if applicable)
 
 ### Creating a Pull Request
 
 1. **Create Branch**: From `develop` or `main`
+
    ```bash
    git checkout -b feature/my-feature
    ```
@@ -121,12 +147,14 @@ docs(deployment): update EKS setup instructions
 2. **Make Changes**: Implement your changes
 
 3. **Commit Changes**: Use conventional commit format
+
    ```bash
    git add .
    git commit -m "feat(service): add new feature"
    ```
 
 4. **Push Branch**: Push to your fork
+
    ```bash
    git push origin feature/my-feature
    ```
@@ -295,7 +323,3 @@ By contributing, you agree that your contributions will be licensed under the sa
 ## Thank You!
 
 Your contributions make EventSphere better for everyone. Thank you for taking the time to contribute!
-
-
-
-
