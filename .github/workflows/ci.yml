@@ -224,15 +224,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
       - name: Setup Conftest
         uses: princespaghetti/setup-conftest@v1
         with:
           version: latest
 
-      - name: Install Gatekeeper Conftest plugin
+      - name: Install Gatekeeper Conftest plugin from source
         run: |
-          conftest plugin install \
-            https://github.com/clover/gatekeeper-conftest/releases/download/v0.1.1/gatekeeper-conftest_0.1.1_linux_amd64.tar.gz
+          git clone https://github.com/clover/gatekeeper-conftest.git
+          cd gatekeeper-conftest
+          go build .
 
       - name: Run Gatekeeper policy checks
         run: |
@@ -242,7 +248,8 @@ jobs:
           echo "--- Manifests found:"
           find "$MANIFEST_DIR" -type f
 
-          for file in $(find "$MANIFEST_DIR" -type f -name "*.yaml" -o -name "*.yml"); do
+          for file in $(find "$MANIFEST_DIR" -type f \( -name "*.yaml" -o -name "*.yml" \)); do
             echo "Checking: $file"
             conftest gatekeeper "$file" -- --policy "$POLICY_DIR"
           done
+
