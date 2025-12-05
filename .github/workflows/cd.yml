@@ -15,8 +15,6 @@ on:
           - production
 
 env:
-  AWS_REGION: us-east-1
-  CLUSTER_NAME: eventsphere-cluster
   NODE_VERSION: '25.1.0'
 
 jobs:
@@ -65,7 +63,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -76,6 +74,7 @@ jobs:
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           echo "account-id=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+          AWS_REGION="${{ secrets.AWS_REGION }}"
           echo "ECR Registry: ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
       - name: Set up Docker Buildx
@@ -94,8 +93,8 @@ jobs:
           file: ./services/auth-service/Dockerfile
           push: true
           tags: |
-            ${{ steps.get-account-id.outputs.account-id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/auth-service:${{ steps.set-tag.outputs.tag }}
-            ${{ steps.get-account-id.outputs.account-id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/auth-service:latest
+            ${{ secrets.ECR_REPOSITORY }}/auth-service:${{ steps.set-tag.outputs.tag }}
+            ${{ secrets.ECR_REPOSITORY }}/auth-service:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -106,8 +105,8 @@ jobs:
           file: ./services/event-service/Dockerfile
           push: true
           tags: |
-            ${{ steps.get-account-id.outputs.account-id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/event-service:${{ steps.set-tag.outputs.tag }}
-            ${{ steps.get-account-id.outputs.account-id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/event-service:latest
+            ${{ secrets.ECR_REPOSITORY }}/event-service:${{ steps.set-tag.outputs.tag }}
+            ${{ secrets.ECR_REPOSITORY }}/event-service:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -118,8 +117,8 @@ jobs:
           file: ./services/booking-service/Dockerfile
           push: true
           tags: |
-            ${{ steps.get-account-id.outputs.account-id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/booking-service:${{ steps.set-tag.outputs.tag }}
-            ${{ steps.get-account-id.outputs.account-id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/booking-service:latest
+            ${{ secrets.ECR_REPOSITORY }}/booking-service:${{ steps.set-tag.outputs.tag }}
+            ${{ secrets.ECR_REPOSITORY }}/booking-service:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -130,8 +129,8 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           tags: |
-            ${{ steps.get-account-id.outputs.account-id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/frontend:${{ steps.set-tag.outputs.tag }}
-            ${{ steps.get-account-id.outputs.account-id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/frontend:latest
+            ${{ secrets.ECR_REPOSITORY }}/frontend:${{ steps.set-tag.outputs.tag }}
+            ${{ secrets.ECR_REPOSITORY }}/frontend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -154,7 +153,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -168,13 +167,13 @@ jobs:
 
       - name: Configure kubeconfig
         run: |
-          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
 
       - name: Get AWS Account ID
         id: get-account-id
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          ECR_REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          ECR_REGISTRY="${{ secrets.ECR_REPOSITORY }}"
           echo "account-id=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
           echo "ecr-registry=${ECR_REGISTRY}" >> $GITHUB_OUTPUT
           echo "ECR Registry: ${ECR_REGISTRY}"
@@ -306,7 +305,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -315,7 +314,7 @@ jobs:
 
       - name: Configure kubeconfig
         run: |
-          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
 
       - name: Set namespace
         id: set-namespace
