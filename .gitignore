@@ -24,3 +24,4 @@ infrastructure/config/config.env
 *.env
 !.env.example
 !infrastructure/config/config.env.example
+infrastructure/config/config.env

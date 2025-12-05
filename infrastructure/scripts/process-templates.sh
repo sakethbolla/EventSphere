@@ -69,6 +69,10 @@ export CLUSTER_NAME="${CLUSTER_NAME:-eventsphere-cluster}"
 
 # Calculate derived values
 if [ -n "$AWS_ACCOUNT_ID" ]; then
+    # Unset ECR_REGISTRY if it's invalid (doesn't contain account ID or starts with .dkr)
+    if [[ "$ECR_REGISTRY" == .dkr* ]] || [[ ! "$ECR_REGISTRY" == *"$AWS_ACCOUNT_ID"* ]]; then
+        unset ECR_REGISTRY
+    fi
     export ECR_REGISTRY="${ECR_REGISTRY:-${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com}"
     export FLUENT_BIT_ROLE_ARN="${FLUENT_BIT_ROLE_ARN:-arn:aws:iam::${AWS_ACCOUNT_ID}:role/fluent-bit-role}"
     export EXTERNAL_SECRETS_ROLE_ARN="${EXTERNAL_SECRETS_ROLE_ARN:-arn:aws:iam::${AWS_ACCOUNT_ID}:role/external-secrets-role}"
