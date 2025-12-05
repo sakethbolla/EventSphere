@@ -107,8 +107,8 @@ jobs:
 
       - name: Lint Kubernetes manifests
         run: |
-          echo "Linting Kubernetes manifests in k8s/generated/base/"
-          kube-linter lint k8s/generated/base/ || echo "Kube-linter found issues (non-blocking)"
+          echo "Linting Kubernetes manifests in k8s/"
+          kube-linter lint k8s/ || echo "Kube-linter found issues (non-blocking)"
         continue-on-error: true
 
       - name: Install kube-score
@@ -120,7 +120,7 @@ jobs:
       - name: Score Kubernetes manifests
         run: |
           echo "Scoring Kubernetes manifests"
-          kube-score score k8s/generated/base/ || echo "Kube-score found issues (non-blocking)"
+          kube-score score k8s/ || echo "Kube-score found issues (non-blocking)"
         continue-on-error: true
 
   docker-build-scan:
@@ -242,14 +242,25 @@ jobs:
 
       - name: Run Gatekeeper policy checks
         run: |
-          MANIFEST_DIR="k8s/generated/base"
           POLICY_DIR="policy"
+          MANIFEST_ROOT="k8s"
 
-          echo "--- Manifests found:"
-          find "$MANIFEST_DIR" -type f
+          if [ ! -d "$MANIFEST_ROOT" ]; then
+            echo "Manifest root '$MANIFEST_ROOT' not found, nothing to validate."
+            exit 0
+          fi
 
-          for file in $(find "$MANIFEST_DIR" -type f \( -name "*.yaml" -o -name "*.yml" \)); do
+          echo "--- Manifests found under $MANIFEST_ROOT:"
+          find "$MANIFEST_ROOT" -type f \( -name '*.yaml' -o -name '*.yml' \) || true
+
+          FOUND_ANY=false
+          while IFS= read -r file; do
+            FOUND_ANY=true
             echo "Checking: $file"
             conftest gatekeeper "$file" -- --policy "$POLICY_DIR"
-          done
+          done < <(find "$MANIFEST_ROOT" -type f \( -name '*.yaml' -o -name '*.yml' \))
+
+          if [ "$FOUND_ANY" = false ]; then
+            echo "No YAML manifests found under $MANIFEST_ROOT – nothing to validate."
+          fi
 
