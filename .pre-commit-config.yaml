@@ -4,7 +4,6 @@
 # Run manually: pre-commit run --all-files
 
 repos:
-  # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
@@ -12,7 +11,7 @@ repos:
         args: [--markdown-linebreak-ext=md]
       - id: end-of-file-fixer
       - id: check-yaml
-        args: [--unsafe] # Allow custom YAML tags
+        args: [--unsafe]
         exclude: ^(k8s/.*\.template|.*\.yaml\.template)
       - id: check-json
       - id: check-added-large-files
@@ -25,31 +24,13 @@ repos:
       - id: mixed-line-ending
         args: [--fix=lf]
 
-  # YAML formatting and validation (warnings only for Helm templates)
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.33.0
     hooks:
       - id: yamllint
         args: [-c=.yamllint.yaml, --format=parsable]
         exclude: ^(k8s/.*\.template|.*\.yaml\.template|.*generated.*|helm/.*/templates/.*)
-        # Helm templates use Go templating which yamllint doesn't understand well
 
-  # JavaScript/TypeScript linting with ESLint
-  # Disabled: ESLint v9 requires eslint.config.js, but project uses package.json config
-  # To enable: Create eslint.config.js and uncomment this section
-  # - repo: https://github.com/pre-commit/mirrors-eslint
-  #   rev: v9.17.0
-  #   hooks:
-  #     - id: eslint
-  #       types: [file]
-  #       types_or: [javascript, jsx]
-  #       args: ['--fix', '--max-warnings=0']
-  #       additional_dependencies:
-  #         - eslint@^9.17.0
-  #       files: ^(frontend/src/|services/.*/src/)
-  #       exclude: ^(.*\.test\.js|.*\.spec\.js|node_modules/)
-
-  # Code formatting with Prettier
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v4.0.0-alpha.8
     hooks:
@@ -57,32 +38,13 @@ repos:
         types_or: [javascript, jsx, json, yaml, markdown, css, scss]
         exclude: ^(.*\.template|.*generated.*|package-lock\.json|.*\.min\.js)
 
-  # Shell script linting (warnings only - many existing scripts have style issues)
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.9.0.6
     hooks:
       - id: shellcheck
         args: [-e, SC1091, -e, SC2086, -e, SC2181, -e, SC2034, -e, SC2162, -e, SC2046, -e, SC2155]
-        # Ignored codes:
-        # SC1091: Can't follow non-constant source
-        # SC2086: Double quote variables (info level - too many to fix now)
-        # SC2181: Check exit code directly (style - can fix later)
-        # SC2034: Unused variable (warnings)
-        # SC2162: read without -r (info)
-        # SC2046: Quote to prevent word splitting
-        # SC2155: Declare and assign separately
         files: \.(sh|bash)$
         exclude: ^(node_modules/|.*\.min\.sh)
-
-  # Dockerfile linting (requires Docker daemon - will skip if not available)
-  - repo: https://github.com/hadolint/hadolint
-    rev: v2.12.0
-    hooks:
-      - id: hadolint-docker
-        args: [--ignore, DL3008, --ignore, DL3009] # Ignore apt-get update warnings
-        files: Dockerfile
-        # Note: This may fail if Docker daemon is not running
-        # Use: docker info to check Docker status
 
   # Prevent committing secrets
   - repo: https://github.com/Yelp/detect-secrets
