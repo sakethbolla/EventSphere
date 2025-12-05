@@ -91,13 +91,26 @@ jobs:
         working-directory: ./frontend
         run: npm run build || echo "Build check completed"
 
-  k8s-validation:
+k8s-validation:
     name: Kubernetes Manifest Validation
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+          kustomize version
+
+      - name: Generate manifests (dev overlay)
+        run: |
+          mkdir -p k8s/generated/base
+          kustomize build k8s/overlays/dev > k8s/generated/base/all.yaml
+          echo "Generated manifests in k8s/generated/base:"
+          ls -l k8s/generated/base
 
       - name: Install kube-linter
         run: |
@@ -107,8 +120,8 @@ jobs:
 
       - name: Lint Kubernetes manifests
         run: |
-          echo "Linting Kubernetes manifests in k8s/"
-          kube-linter lint k8s/ || echo "Kube-linter found issues (non-blocking)"
+          echo "Linting Kubernetes manifests in k8s/generated/base/"
+          kube-linter lint k8s/generated/base/ || echo "Kube-linter found issues (non-blocking)"
         continue-on-error: true
 
       - name: Install kube-score
@@ -120,16 +133,9 @@ jobs:
       - name: Score Kubernetes manifests
         run: |
           echo "Scoring Kubernetes manifests"
-          FILES=$(find k8s -type f \( -name '*.yaml' -o -name '*.yml' \))
-
-          if [ -z "$FILES" ]; then
-            echo "No Kubernetes manifest files found under k8s/, skipping kube-score."
-            exit 0
-          fi
-
-          kube-score score $FILES || echo "Kube-score found issues (non-blocking)"
+          # Score the generated bundle file
+          kube-score score k8s/generated/base/all.yaml || echo "Kube-score found issues (non-blocking)"
         continue-on-error: true
-
 
   docker-build-scan:
     name: Docker Build & Security Scan
@@ -232,10 +238,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+          kustomize version
+
+      - name: Generate manifests (dev overlay)
+        run: |
+          mkdir -p k8s/generated/base
+          kustomize build k8s/overlays/dev > k8s/generated/base/all.yaml
+          echo "Generated manifests in k8s/generated/base:"
+          ls -l k8s/generated/base
+
       - name: Install Kyverno CLI
         uses: kyverno/action-install-cli@v0.2.0
         with:
-          release: 'v1.12.0' # or whatever you prefer
+          release: 'v1.12.0'
 
       - name: Show Kyverno version
         run: kyverno version
@@ -251,7 +270,7 @@ jobs:
           fi
 
           if [ ! -d "$MANIFEST_ROOT" ]; then
-            echo "Manifest root '$MANIFEST_ROOT' not found (is k8s/generated/base committed or generated in CI?)"
+            echo "Manifest root '$MANIFEST_ROOT' not found, skipping Kyverno validation."
             exit 0
           fi
 
@@ -259,8 +278,4 @@ jobs:
           echo "Policies  : $POLICY_FILE"
           echo "Resources : $MANIFEST_ROOT"
 
-          find "$MANIFEST_ROOT" -type f \( -name '*.yaml' -o -name '*.yml' \)
-
           kyverno apply "$POLICY_FILE" --resource "$MANIFEST_ROOT"
-
-
