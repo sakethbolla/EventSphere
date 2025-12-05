@@ -1,7 +1,3 @@
-# Kyverno Policies for Kubernetes Manifest Validation
-# These policies enforce security best practices before deployment
-
----
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -15,41 +11,42 @@ metadata:
 spec:
   validationFailureAction: Enforce
   rules:
-  - name: check-run-as-non-root
-    match:
-      resources:
-        kinds:
-        - Pod
-        - Deployment
-        - StatefulSet
-        - DaemonSet
-    validate:
-      message: "Containers must run as non-root user (pod-level or container-level securityContext)"
-      anyPattern:
-      # Pattern for Deployment/StatefulSet/DaemonSet with pod-level runAsNonRoot
-      - spec:
-          template:
-            spec:
+    - name: check-run-as-non-root
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+      validate:
+        message: "Containers must run as non-root user (pod-level or container-level securityContext)"
+        anyPattern:
+          # Deployment/StatefulSet/DaemonSet with pod-level runAsNonRoot
+          - spec:
+              template:
+                spec:
+                  securityContext:
+                    runAsNonRoot: true
+          # Deployment/StatefulSet/DaemonSet with container-level runAsNonRoot
+          - spec:
+              template:
+                spec:
+                  containers:
+                    - name: "*"
+                      securityContext:
+                        runAsNonRoot: true
+          # Pod with pod-level runAsNonRoot
+          - spec:
               securityContext:
                 runAsNonRoot: true
-      # Pattern for Deployment/StatefulSet/DaemonSet with container-level runAsNonRoot
-      - spec:
-          template:
-            spec:
+          # Pod with container-level runAsNonRoot
+          - spec:
               containers:
-              - name: "*"
-                securityContext:
-                  runAsNonRoot: true
-      # Pattern for Pod with pod-level runAsNonRoot
-      - spec:
-          securityContext:
-            runAsNonRoot: true
-      # Pattern for Pod with container-level runAsNonRoot
-      - spec:
-          containers:
-          - name: "*"
-            securityContext:
-              runAsNonRoot: true
+                - name: "*"
+                  securityContext:
+                    runAsNonRoot: true
 
 ---
 apiVersion: kyverno.io/v1
@@ -65,33 +62,34 @@ metadata:
 spec:
   validationFailureAction: Audit
   rules:
-  - name: check-read-only-rootfs
-    match:
-      resources:
-        kinds:
-        - Pod
-        - Deployment
-        - StatefulSet
-        - DaemonSet
-        namespaces:
-        - prod
-    validate:
-      message: "Consider using read-only root filesystem for enhanced security"
-      anyPattern:
-      # Pattern for Deployment/StatefulSet/DaemonSet (has template)
-      - spec:
-          template:
-            spec:
+    - name: check-read-only-rootfs
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+              namespaces:
+                - prod
+      validate:
+        message: "Consider using read-only root filesystem for enhanced security"
+        anyPattern:
+          # Deployment/StatefulSet/DaemonSet (has template)
+          - spec:
+              template:
+                spec:
+                  containers:
+                    - name: "*"
+                      securityContext:
+                        readOnlyRootFilesystem: "?true"
+          # Pod (no template)
+          - spec:
               containers:
-              - name: "*"
-                securityContext:
-                  readOnlyRootFilesystem: "?true"
-      # Pattern for Pod (no template)
-      - spec:
-          containers:
-          - name: "*"
-            securityContext:
-              readOnlyRootFilesystem: "?true"
+                - name: "*"
+                  securityContext:
+                    readOnlyRootFilesystem: "?true"
 
 ---
 apiVersion: kyverno.io/v1
@@ -107,41 +105,42 @@ metadata:
 spec:
   validationFailureAction: Enforce
   rules:
-  - name: check-resource-limits
-    match:
-      resources:
-        kinds:
-        - Pod
-        - Deployment
-        - StatefulSet
-        - DaemonSet
-    validate:
-      message: "All containers must have resource requests and limits"
-      anyPattern:
-      # Pattern for Deployment/StatefulSet/DaemonSet (has template)
-      - spec:
-          template:
-            spec:
+    - name: check-resource-limits
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+      validate:
+        message: "All containers must have resource requests and limits"
+        anyPattern:
+          # Deployment/StatefulSet/DaemonSet (has template)
+          - spec:
+              template:
+                spec:
+                  containers:
+                    - name: "*"
+                      resources:
+                        requests:
+                          memory: "?*"
+                          cpu: "?*"
+                        limits:
+                          memory: "?*"
+                          cpu: "?*"
+          # Pod (no template)
+          - spec:
               containers:
-              - name: "*"
-                resources:
-                  requests:
-                    memory: "?*"
-                    cpu: "?*"
-                  limits:
-                    memory: "?*"
-                    cpu: "?*"
-      # Pattern for Pod (no template)
-      - spec:
-          containers:
-          - name: "*"
-            resources:
-              requests:
-                memory: "?*"
-                cpu: "?*"
-              limits:
-                memory: "?*"
-                cpu: "?*"
+                - name: "*"
+                  resources:
+                    requests:
+                      memory: "?*"
+                      cpu: "?*"
+                    limits:
+                      memory: "?*"
+                      cpu: "?*"
 
 ---
 apiVersion: kyverno.io/v1
@@ -157,31 +156,32 @@ metadata:
 spec:
   validationFailureAction: Enforce
   rules:
-  - name: check-privilege-escalation
-    match:
-      resources:
-        kinds:
-        - Pod
-        - Deployment
-        - StatefulSet
-        - DaemonSet
-    validate:
-      message: "Privilege escalation must be disabled"
-      anyPattern:
-      # Pattern for Deployment/StatefulSet/DaemonSet (has template)
-      - spec:
-          template:
-            spec:
+    - name: check-privilege-escalation
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+      validate:
+        message: "Privilege escalation must be disabled"
+        anyPattern:
+          # Deployment/StatefulSet/DaemonSet (has template)
+          - spec:
+              template:
+                spec:
+                  containers:
+                    - name: "*"
+                      securityContext:
+                        allowPrivilegeEscalation: false
+          # Pod (no template)
+          - spec:
               containers:
-              - name: "*"
-                securityContext:
-                  allowPrivilegeEscalation: false
-      # Pattern for Pod (no template)
-      - spec:
-          containers:
-          - name: "*"
-            securityContext:
-              allowPrivilegeEscalation: false
+                - name: "*"
+                  securityContext:
+                    allowPrivilegeEscalation: false
 
 ---
 apiVersion: kyverno.io/v1
@@ -197,32 +197,33 @@ metadata:
 spec:
   validationFailureAction: Audit
   rules:
-  - name: check-capabilities
-    match:
-      resources:
-        kinds:
-        - Pod
-        - Deployment
-        - StatefulSet
-        - DaemonSet
-    validate:
-      message: "Containers should drop all capabilities (exceptions allowed with justification)"
-      anyPattern:
-      # Pattern for Deployment/StatefulSet/DaemonSet (has template)
-      - spec:
-          template:
-            spec:
+    - name: check-capabilities
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+      validate:
+        message: "Containers should drop all capabilities (exceptions allowed with justification)"
+        anyPattern:
+          # Deployment/StatefulSet/DaemonSet (has template)
+          - spec:
+              template:
+                spec:
+                  containers:
+                    - name: "*"
+                      securityContext:
+                        capabilities:
+                          drop:
+                            - ALL
+          # Pod (no template)
+          - spec:
               containers:
-              - name: "*"
-                securityContext:
-                  capabilities:
-                    drop:
-                    - ALL
-      # Pattern for Pod (no template)
-      - spec:
-          containers:
-          - name: "*"
-            securityContext:
-              capabilities:
-                drop:
-                - ALL
+                - name: "*"
+                  securityContext:
+                    capabilities:
+                      drop:
+                        - ALL
