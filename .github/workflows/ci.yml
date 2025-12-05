@@ -92,50 +92,43 @@ jobs:
         run: npm run build || echo "Build check completed"
 
   k8s-validation:
-      name: Kubernetes Manifest Validation
-      runs-on: ubuntu-latest
+    name: Kubernetes Manifest Validation
+    runs-on: ubuntu-latest
 
-      steps:
-        - name: Checkout code
-          uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Generate Kubernetes manifests
+        run: |
+          export AWS_ACCOUNT_ID="${{ secrets.AWS_ACCOUNT_ID }}"
+          export ECR_REGISTRY="${{ secrets.ECR_REGISTRY }}"
+          chmod +x infrastructure/scripts/process-templates.sh
+          infrastructure/scripts/process-templates.sh
 
-        - name: Install kustomize
-          run: |
-            curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-            sudo mv kustomize /usr/local/bin/
-            kustomize version
+      - name: Install kube-linter
+        run: |
+          curl -L https://github.com/stackrox/kube-linter/releases/download/v0.6.5/kube-linter-linux.tar.gz | tar -xz
+          sudo mv kube-linter /usr/local/bin/
+          kube-linter version
 
-        - name: Generate manifests (dev overlay)
-          run: |
-            mkdir -p k8s/generated/base
-            kustomize build k8s/overlays/dev > k8s/generated/base/all.yaml
-            echo "Generated manifests in k8s/generated/base:"
-            ls -l k8s/generated/base
+      - name: Lint Kubernetes manifests
+        run: |
+          echo "Linting Kubernetes manifests in k8s/generated/base/"
+          kube-linter lint k8s/generated/base/ || echo "Kube-linter found issues (non-blocking)"
+        continue-on-error: true
 
-        - name: Install kube-linter
-          run: |
-            curl -L https://github.com/stackrox/kube-linter/releases/download/v0.6.5/kube-linter-linux.tar.gz | tar -xz
-            sudo mv kube-linter /usr/local/bin/
-            kube-linter version
+      - name: Install kube-score
+        run: |
+          curl -L https://github.com/zegl/kube-score/releases/download/v1.18.0/kube-score_1.18.0_linux_amd64.tar.gz | tar -xz
+          sudo mv kube-score /usr/local/bin/
+          kube-score version
 
-        - name: Lint Kubernetes manifests
-          run: |
-            echo "Linting Kubernetes manifests in k8s/generated/base/"
-            kube-linter lint k8s/generated/base/ || echo "Kube-linter found issues (non-blocking)"
-          continue-on-error: true
-
-        - name: Install kube-score
-          run: |
-            curl -L https://github.com/zegl/kube-score/releases/download/v1.18.0/kube-score_1.18.0_linux_amd64.tar.gz | tar -xz
-            sudo mv kube-score /usr/local/bin/
-            kube-score version
-
-        - name: Score Kubernetes manifests
-          run: |
-            echo "Scoring Kubernetes manifests"
-            # Score the generated bundle file
-            kube-score score k8s/generated/base/all.yaml || echo "Kube-score found issues (non-blocking)"
-          continue-on-error: true
+      - name: Score Kubernetes manifests
+        run: |
+          echo "Scoring Kubernetes manifests in k8s/generated/base/"
+          kube-score score k8s/generated/base/ || echo "Kube-score found issues (non-blocking)"
+        continue-on-error: true
 
   docker-build-scan:
     name: Docker Build & Security Scan
@@ -238,23 +231,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install kustomize
+      - name: Generate Kubernetes manifests
         run: |
-          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-          sudo mv kustomize /usr/local/bin/
-          kustomize version
-
-      - name: Generate manifests (dev overlay)
-        run: |
-          mkdir -p k8s/generated/base
-          kustomize build k8s/overlays/dev > k8s/generated/base/all.yaml
-          echo "Generated manifests in k8s/generated/base:"
-          ls -l k8s/generated/base
+          export AWS_ACCOUNT_ID="${{ secrets.AWS_ACCOUNT_ID }}"
+          export ECR_REGISTRY="${{ secrets.ECR_REGISTRY }}"
+          chmod +x infrastructure/scripts/process-templates.sh
+          infrastructure/scripts/process-templates.sh
 
       - name: Install Kyverno CLI
         uses: kyverno/action-install-cli@v0.2.0
         with:
-          release: 'v1.12.0'
+          release: 'v1.12.0' 
 
       - name: Show Kyverno version
         run: kyverno version
