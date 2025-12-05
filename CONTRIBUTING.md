@@ -42,6 +42,11 @@ Thank you for your interest in contributing to EventSphere! This document provid
 
 3. **Set up Pre-commit Hooks** (Recommended)
 
+   Pre-commit hooks automatically lint and format your code before commits:
+   - **YAML linting** (yamllint)
+   - **Code formatting** (Prettier)
+   - **Shell script linting** (ShellCheck)
+
    ```bash
    # Install pre-commit (requires Python)
    pip install pre-commit
@@ -125,7 +130,7 @@ docs(deployment): update EKS setup instructions
 
 ### Before Submitting
 
-1. **Run Pre-commit Hooks**: Pre-commit hooks will run automatically on `git commit`
+1. **Run Pre-commit Hooks**: Pre-commit hooks automatically lint and format code on `git commit`
    ```bash
    # Or run manually before committing
    pre-commit run --all-files

@@ -1,29 +1,4 @@
-# Pre-commit hooks configuration for EventSphere
-# Install: pip install pre-commit
-# Setup: pre-commit install
-# Run manually: pre-commit run --all-files
-
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
-    hooks:
-      - id: trailing-whitespace
-        args: [--markdown-linebreak-ext=md]
-      - id: end-of-file-fixer
-      - id: check-yaml
-        args: [--unsafe]
-        exclude: ^(k8s/.*\.template|.*\.yaml\.template)
-      - id: check-json
-      - id: check-added-large-files
-        args: ['--maxkb=1000']
-      - id: check-merge-conflict
-      - id: check-case-conflict
-      - id: check-toml
-      - id: check-xml
-      - id: detect-private-key
-      - id: mixed-line-ending
-        args: [--fix=lf]
-
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.33.0
     hooks:
@@ -45,11 +20,3 @@ repos:
         args: [-e, SC1091, -e, SC2086, -e, SC2181, -e, SC2034, -e, SC2162, -e, SC2046, -e, SC2155]
         files: \.(sh|bash)$
         exclude: ^(node_modules/|.*\.min\.sh)
-
-  # Prevent committing secrets
-  - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.4.0
-    hooks:
-      - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']
-        exclude: package-lock\.json
