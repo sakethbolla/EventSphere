@@ -170,7 +170,7 @@ jobs:
           # TODO: Investigate and fix vulnerabilities, then change back to '1'
           exit-code: '0'
           hide-progress: true
-          version: 'latest'
+          trivy_version: 'latest'
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v3

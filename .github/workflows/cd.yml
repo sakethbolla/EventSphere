@@ -143,7 +143,6 @@ jobs:
       id-token: write
     environment:
       name: ${{ needs.determine-environment.outputs.environment }}
-      url: ${{ steps.get-ingress-url.outputs.url }}
     
     steps:
       - name: Checkout code
