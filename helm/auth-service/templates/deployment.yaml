@@ -72,3 +72,10 @@ spec:
             port: 4001
           initialDelaySeconds: 10
           periodSeconds: 5
+        securityContext:
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
