@@ -6,6 +6,7 @@ metadata:
   labels:
     app: notification-service
     tier: backend
+    app.kubernetes.io/part-of: eventsphere
 spec:
   replicas: 2
   selector:
@@ -16,6 +17,7 @@ spec:
       labels:
         app: notification-service
         tier: backend
+        app.kubernetes.io/part-of: eventsphere
     spec:
       serviceAccountName: notification-service-sa
       securityContext:

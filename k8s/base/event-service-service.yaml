@@ -5,6 +5,7 @@ metadata:
   namespace: prod
   labels:
     app: event-service
+    app.kubernetes.io/part-of: eventsphere
 spec:
   type: ClusterIP
   ports:
