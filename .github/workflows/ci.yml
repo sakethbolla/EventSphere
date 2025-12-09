@@ -4,8 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - 'feature/**'
-      - 'fix/**'
+      - main # Only run on pushes to main (not PR branches)
 
 env:
   NODE_VERSION: '25.1.0'
@@ -14,7 +13,7 @@ jobs:
   code-quality:
     name: Code Quality (Lint & Test)
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -98,10 +97,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Generate Kubernetes manifests
         env:
-          AWS_REGION:   ${{ secrets.AWS_REGION }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
           CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
           ECR_REGISTRY: ${{ secrets.ECR_REPOSITORY }}
         run: |
@@ -131,7 +130,6 @@ jobs:
           echo "Scoring Kubernetes manifests in k8s/generated/base/"
           kube-score score k8s/generated/base/*.yaml || echo "Kube-score found issues (non-blocking)"
         continue-on-error: true
-
 
   docker-build-scan:
     name: Docker Build & Security Scan
@@ -200,7 +198,7 @@ jobs:
     name: Helm Chart Validation
     runs-on: ubuntu-latest
     continue-on-error: true
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -236,7 +234,7 @@ jobs:
 
       - name: Generate Kubernetes manifests
         env:
-          AWS_REGION:   ${{ secrets.AWS_REGION || 'us-east-1' }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
           CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME || 'eventsphere-cluster' }}
           ECR_REGISTRY: ${{ secrets.ECR_REPOSITORY || '123456789012.dkr.ecr.us-east-1.amazonaws.com' }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID || '123456789012' }}
@@ -247,7 +245,7 @@ jobs:
       - name: Install Kyverno CLI
         uses: kyverno/action-install-cli@v0.2.0
         with:
-          release: 'v1.12.0' 
+          release: 'v1.12.0'
 
       - name: Show Kyverno version
         run: kyverno version
