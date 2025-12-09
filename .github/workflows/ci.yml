@@ -2,9 +2,6 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches:
-      - main # Only run on pushes to main (not PR branches)
 
 env:
   NODE_VERSION: '25.1.0'
