@@ -40,5 +40,14 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "jest": {
+    "moduleNameMapper": {
+      "^react-router-dom$": "react-router-dom/dist/index.js",
+      "^react-router/dom$": "react-router/dist/development/dom-export.js"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(react-router|react-router-dom|axios)/)"
+    ]
   }
 }

@@ -56,7 +56,9 @@ jobs:
 
       - name: Run frontend tests
         working-directory: ./frontend
-        run: npm test -- --watchAll=false --coverage
+        env:
+          CI: true
+        run: npm test
 
       - name: Lint auth-service
         working-directory: ./services/auth-service
