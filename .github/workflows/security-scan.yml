@@ -1,0 +1,33 @@
+name: Security Scan
+
+# This workflow is a placeholder for GitHub Code Scanning configuration.
+# Actual security scans are performed in the CI workflow (ci.yml) as part of the
+# docker-build-scan job, which uses Trivy to scan Docker images and uploads
+# results to GitHub Security tab via SARIF.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# This workflow exists to satisfy GitHub Code Scanning configuration.
+# The actual security scanning happens in .github/workflows/ci.yml
+# in the docker-build-scan job which:
+# - Builds Docker images for all services
+# - Scans with Trivy for vulnerabilities
+# - Uploads results using github/codeql-action/upload-sarif@v3
+
+jobs:
+  security-scan:
+    name: Security Scan (Reference)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Note
+        run: |
+          echo "Security scanning is performed in the CI workflow (ci.yml)"
+          echo "See the 'docker-build-scan' job for Trivy vulnerability scanning"
+          echo "Results are uploaded to GitHub Security tab via SARIF"
