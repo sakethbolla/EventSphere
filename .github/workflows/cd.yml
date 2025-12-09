@@ -134,6 +134,31 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Install Cosign (for signing)
+        run: |
+          COSIGN_VERSION="v2.2.1"
+          wget -O /tmp/cosign https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64
+          sudo mv /tmp/cosign /usr/local/bin/cosign
+          sudo chmod +x /usr/local/bin/cosign
+          cosign version
+
+      - name: Sign images with Cosign
+        env:
+          COSIGN_EXPERIMENTAL: '1'
+        run: |
+          IMAGE_TAG="${{ steps.set-tag.outputs.tag }}"
+          REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+
+          echo "Signing images in registry: ${REGISTRY} with tag: ${IMAGE_TAG}"
+          SERVICES=("auth-service" "event-service" "booking-service" "frontend")
+
+          for SERVICE in "${SERVICES[@]}"; do
+            IMAGE="${REGISTRY}/${SERVICE}:${IMAGE_TAG}"
+            echo "Signing ${IMAGE}..."
+            cosign sign --yes "${IMAGE}"
+            echo ""
+          done
+
   deploy:
     name: Deploy to EKS
     runs-on: ubuntu-latest
