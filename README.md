@@ -30,32 +30,32 @@ All services communicate over HTTP and store data in MongoDB. Ensure that a Mong
 
 ```
 EventSphere/
-├── frontend/                    # React frontend application
-├── services/                    # Microservices
+├── frontend/                      # React frontend application
+├── services/                      # Microservices
 │   ├── auth-service/
 │   ├── event-service/
 │   ├── booking-service/
 │   └── notification-service/
-├── k8s/                         # Kubernetes manifests
-│   ├── base/                    # Base configurations
-│   ├── mongodb/                 # MongoDB StatefulSet
-│   ├── ingress/                 # ALB Ingress config
-│   ├── security/                # Security policies
-│   ├── hpa/                     # Horizontal Pod Autoscaling
-│   └── overlays/                # Environment-specific configs
-├── infrastructure/              # Infrastructure as Code
-│   ├── eksctl-cluster.yaml      # EKS cluster config
-│   └── scripts/                 # Setup/teardown scripts
-├── monitoring/                  # Observability configs
-│   ├── prometheus/              # Prometheus setup
-│   ├── grafana/                 # Grafana dashboards
-│   └── cloudwatch/              # CloudWatch logging
-├── .github/                     # CI/CD workflows
-│   └── workflows/               # GitHub Actions
-│       ├── ci.yml               # CI pipeline (Code Quality, K8s Validation, Security Scans)
-│       └── cd.yml               # CD pipeline (Build, Push, Sign, Deploy to EKS)
-│   ├── CODEOWNERS               # Defines codeowners
-│   └── PULL_REQUEST_TEMPLATE.md # Template for PR Descriptions
+├── k8s/                           # Kubernetes manifests
+│   ├── base/                      # Base configurations
+│   ├── mongodb/                   # MongoDB StatefulSet
+│   ├── ingress/                   # ALB Ingress config
+│   ├── security/                  # Security policies
+│   ├── hpa/                       # Horizontal Pod Autoscaling
+│   └── overlays/                  # Environment-specific configs
+├── infrastructure/                # Infrastructure as Code
+│   ├── eksctl-cluster.yaml        # EKS cluster config
+│   └── scripts/                   # Setup/teardown scripts
+├── monitoring/                    # Observability configs
+│   ├── prometheus/                # Prometheus setup
+│   ├── grafana/                   # Grafana dashboards
+│   └── cloudwatch/                # CloudWatch logging
+├── .github/                       # CI/CD workflows
+│   └── workflows/                 # GitHub Actions
+│       ├── ci.yml                 # CI pipeline (Code Quality, K8s Validation, Security Scans)
+│       └── cd.yml                 # CD pipeline (Build, Push, Sign, Deploy to EKS)
+│   ├── CODEOWNERS                 # Defines codeowners
+│   └── PULL_REQUEST_TEMPLATE.md   # Template for PR Descriptions
 └── README.md
 ```
 
