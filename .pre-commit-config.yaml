@@ -10,9 +10,9 @@ repos:
     rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
-        files: \.(js|jsx|json|yaml|yml|md|css|scss)$
+        types_or: [javascript, jsx, json, yaml, markdown, css, scss]
         exclude: ^(.*\.template|.*generated.*|package-lock\.json|.*\.min\.js)
-        always_run: false
+        args: [--no-error-on-unmatched-pattern]
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.9.0.6
