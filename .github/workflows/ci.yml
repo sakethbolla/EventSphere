@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+  push:
 
 env:
   NODE_VERSION: '25.1.0'
