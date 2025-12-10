@@ -49,6 +49,7 @@ cd infrastructure
 ./scripts/build-and-push-images.sh
 ./scripts/process-templates.sh
 ./scripts/deploy-services.sh
+./scripts/enable-security.sh
 ```
 
 After getting ALB address, update DNS records so the domain points to ALB
