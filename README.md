@@ -207,6 +207,9 @@ cd infrastructure/scripts
 
 # 5. Deploy services
 ./deploy-services.sh
+
+# 6. Enable Guardduty and EKS Control Plane Logging
+./enable-security.sh
 ```
 
 For detailed architecture and troubleshooting, see [SNS_LAMBDA_SETUP.md](SNS_LAMBDA_SETUP.md).

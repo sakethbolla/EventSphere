@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <style>
+      * {
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      h1 {
+        text-align: center;
+      }
+      .group-header th {
+        font-size: 200%;
+      }
+      .sub-header th {
+        font-size: 150%;
+      }
+      table, th, td {
+        border: 1px solid black;
+        border-collapse: collapse;
+        white-space: nowrap;
+        padding: .3em;
+      }
+      table {
+        margin: 0 auto;
+      }
+      .severity {
+        text-align: center;
+        font-weight: bold;
+        color: #fafafa;
+      }
+      .severity-LOW .severity { background-color: #5fbb31; }
+      .severity-MEDIUM .severity { background-color: #e9c600; }
+      .severity-HIGH .severity { background-color: #ff8800; }
+      .severity-CRITICAL .severity { background-color: #e40000; }
+      .severity-UNKNOWN .severity { background-color: #747474; }
+      .severity-LOW { background-color: #5fbb3160; }
+      .severity-MEDIUM { background-color: #e9c60060; }
+      .severity-HIGH { background-color: #ff880060; }
+      .severity-CRITICAL { background-color: #e4000060; }
+      .severity-UNKNOWN { background-color: #74747460; }
+      table tr td:first-of-type {
+        font-weight: bold;
+      }
+      .links a,
+      .links[data-more-links=on] a {
+        display: block;
+      }
+      .links[data-more-links=off] a:nth-of-type(1n+5) {
+        display: none;
+      }
+      a.toggle-more-links { cursor: pointer; }
+    </style>
+    <title>eventsphere-frontend:latest (alpine 3.22.2) - Trivy Report - 2025-12-09 11:59:09.832194064 -0500 EST m=+0.854259458 </title>
+    <script>
+      window.onload = function() {
+        document.querySelectorAll('td.links').forEach(function(linkCell) {
+          var links = [].concat.apply([], linkCell.querySelectorAll('a'));
+          [].sort.apply(links, function(a, b) {
+            return a.href > b.href ? 1 : -1;
+          });
+          links.forEach(function(link, idx) {
+            if (links.length > 3 && 3 === idx) {
+              var toggleLink = document.createElement('a');
+              toggleLink.innerText = "Toggle more links";
+              toggleLink.href = "#toggleMore";
+              toggleLink.setAttribute("class", "toggle-more-links");
+              linkCell.appendChild(toggleLink);
+            }
+            linkCell.appendChild(link);
+          });
+        });
+        document.querySelectorAll('a.toggle-more-links').forEach(function(toggleLink) {
+          toggleLink.onclick = function() {
+            var expanded = toggleLink.parentElement.getAttribute("data-more-links");
+            toggleLink.parentElement.setAttribute("data-more-links", "on" === expanded ? "off" : "on");
+            return false;
+          };
+        });
+      };
+    </script>
+  </head>
+  <body>
+    <h1>eventsphere-frontend:latest (alpine 3.22.2) - Trivy Report - 2025-12-09 11:59:09.832655202 -0500 EST m=+0.854720586</h1>
+    <table>
+      <tr class="group-header"><th colspan="6">alpine</th></tr>
+      <tr class="sub-header">
+        <th>Package</th>
+        <th>Vulnerability ID</th>
+        <th>Severity</th>
+        <th>Installed Version</th>
+        <th>Fixed Version</th>
+        <th>Links</th>
+      </tr>
+      <tr class="severity-MEDIUM">
+        <td class="pkg-name">busybox</td>
+        <td>CVE-2024-58251</td>
+        <td class="severity">MEDIUM</td>
+        <td class="pkg-version">1.37.0-r19</td>
+        <td>1.37.0-r20</td>
+        <td class="links" data-more-links="off">
+          <a href="http://www.openwall.com/lists/oss-security/2025/04/23/6">http://www.openwall.com/lists/oss-security/2025/04/23/6</a>
+          <a href="https://bugs.busybox.net/show_bug.cgi?id=15922">https://bugs.busybox.net/show_bug.cgi?id=15922</a>
+          <a href="https://www.busybox.net">https://www.busybox.net</a>
+          <a href="https://www.busybox.net/downloads/">https://www.busybox.net/downloads/</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2024-58251">https://www.cve.org/CVERecord?id=CVE-2024-58251</a>
+        </td>
+      </tr>
+      <tr class="severity-LOW">
+        <td class="pkg-name">busybox</td>
+        <td>CVE-2025-46394</td>
+        <td class="severity">LOW</td>
+        <td class="pkg-version">1.37.0-r19</td>
+        <td>1.37.0-r20</td>
+        <td class="links" data-more-links="off">
+          <a href="http://www.openwall.com/lists/oss-security/2025/04/23/5">http://www.openwall.com/lists/oss-security/2025/04/23/5</a>
+          <a href="http://www.openwall.com/lists/oss-security/2025/04/24/3">http://www.openwall.com/lists/oss-security/2025/04/24/3</a>
+          <a href="https://bugs.busybox.net/show_bug.cgi?id=16018">https://bugs.busybox.net/show_bug.cgi?id=16018</a>
+          <a href="https://lists.busybox.net/pipermail/busybox/2024-July/090806.html">https://lists.busybox.net/pipermail/busybox/2024-July/090806.html</a>
+          <a href="https://lists.busybox.net/pipermail/busybox/2024-July/090814.html">https://lists.busybox.net/pipermail/busybox/2024-July/090814.html</a>
+          <a href="https://www.busybox.net">https://www.busybox.net</a>
+          <a href="https://www.busybox.net/downloads/">https://www.busybox.net/downloads/</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2025-46394">https://www.cve.org/CVERecord?id=CVE-2025-46394</a>
+          <a href="https://www.openwall.com/lists/oss-security/2025/04/23/1">https://www.openwall.com/lists/oss-security/2025/04/23/1</a>
+        </td>
+      </tr>
+      <tr class="severity-MEDIUM">
+        <td class="pkg-name">busybox-binsh</td>
+        <td>CVE-2024-58251</td>
+        <td class="severity">MEDIUM</td>
+        <td class="pkg-version">1.37.0-r19</td>
+        <td>1.37.0-r20</td>
+        <td class="links" data-more-links="off">
+          <a href="http://www.openwall.com/lists/oss-security/2025/04/23/6">http://www.openwall.com/lists/oss-security/2025/04/23/6</a>
+          <a href="https://bugs.busybox.net/show_bug.cgi?id=15922">https://bugs.busybox.net/show_bug.cgi?id=15922</a>
+          <a href="https://www.busybox.net">https://www.busybox.net</a>
+          <a href="https://www.busybox.net/downloads/">https://www.busybox.net/downloads/</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2024-58251">https://www.cve.org/CVERecord?id=CVE-2024-58251</a>
+        </td>
+      </tr>
+      <tr class="severity-LOW">
+        <td class="pkg-name">busybox-binsh</td>
+        <td>CVE-2025-46394</td>
+        <td class="severity">LOW</td>
+        <td class="pkg-version">1.37.0-r19</td>
+        <td>1.37.0-r20</td>
+        <td class="links" data-more-links="off">
+          <a href="http://www.openwall.com/lists/oss-security/2025/04/23/5">http://www.openwall.com/lists/oss-security/2025/04/23/5</a>
+          <a href="http://www.openwall.com/lists/oss-security/2025/04/24/3">http://www.openwall.com/lists/oss-security/2025/04/24/3</a>
+          <a href="https://bugs.busybox.net/show_bug.cgi?id=16018">https://bugs.busybox.net/show_bug.cgi?id=16018</a>
+          <a href="https://lists.busybox.net/pipermail/busybox/2024-July/090806.html">https://lists.busybox.net/pipermail/busybox/2024-July/090806.html</a>
+          <a href="https://lists.busybox.net/pipermail/busybox/2024-July/090814.html">https://lists.busybox.net/pipermail/busybox/2024-July/090814.html</a>
+          <a href="https://www.busybox.net">https://www.busybox.net</a>
+          <a href="https://www.busybox.net/downloads/">https://www.busybox.net/downloads/</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2025-46394">https://www.cve.org/CVERecord?id=CVE-2025-46394</a>
+          <a href="https://www.openwall.com/lists/oss-security/2025/04/23/1">https://www.openwall.com/lists/oss-security/2025/04/23/1</a>
+        </td>
+      </tr>
+      <tr class="severity-HIGH">
+        <td class="pkg-name">libpng</td>
+        <td>CVE-2025-64720</td>
+        <td class="severity">HIGH</td>
+        <td class="pkg-version">1.6.47-r0</td>
+        <td>1.6.51-r0</td>
+        <td class="links" data-more-links="off">
+          <a href="https://access.redhat.com/security/cve/CVE-2025-64720">https://access.redhat.com/security/cve/CVE-2025-64720</a>
+          <a href="https://github.com/pnggroup/libpng/commit/08da33b4c88cfcd36e5a706558a8d7e0e4773643">https://github.com/pnggroup/libpng/commit/08da33b4c88cfcd36e5a706558a8d7e0e4773643</a>
+          <a href="https://github.com/pnggroup/libpng/issues/686">https://github.com/pnggroup/libpng/issues/686</a>
+          <a href="https://github.com/pnggroup/libpng/pull/751">https://github.com/pnggroup/libpng/pull/751</a>
+          <a href="https://github.com/pnggroup/libpng/security/advisories/GHSA-hfc7-ph9c-wcww">https://github.com/pnggroup/libpng/security/advisories/GHSA-hfc7-ph9c-wcww</a>
+          <a href="https://nvd.nist.gov/vuln/detail/CVE-2025-64720">https://nvd.nist.gov/vuln/detail/CVE-2025-64720</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2025-64720">https://www.cve.org/CVERecord?id=CVE-2025-64720</a>
+        </td>
+      </tr>
+      <tr class="severity-HIGH">
+        <td class="pkg-name">libpng</td>
+        <td>CVE-2025-65018</td>
+        <td class="severity">HIGH</td>
+        <td class="pkg-version">1.6.47-r0</td>
+        <td>1.6.51-r0</td>
+        <td class="links" data-more-links="off">
+          <a href="https://access.redhat.com/security/cve/CVE-2025-65018">https://access.redhat.com/security/cve/CVE-2025-65018</a>
+          <a href="https://github.com/pnggroup/libpng/commit/16b5e3823918840aae65c0a6da57c78a5a496a4d">https://github.com/pnggroup/libpng/commit/16b5e3823918840aae65c0a6da57c78a5a496a4d</a>
+          <a href="https://github.com/pnggroup/libpng/commit/218612ddd6b17944e21eda56caf8b4bf7779d1ea">https://github.com/pnggroup/libpng/commit/218612ddd6b17944e21eda56caf8b4bf7779d1ea</a>
+          <a href="https://github.com/pnggroup/libpng/issues/755">https://github.com/pnggroup/libpng/issues/755</a>
+          <a href="https://github.com/pnggroup/libpng/pull/757">https://github.com/pnggroup/libpng/pull/757</a>
+          <a href="https://github.com/pnggroup/libpng/security/advisories/GHSA-7wv6-48j4-hj3g">https://github.com/pnggroup/libpng/security/advisories/GHSA-7wv6-48j4-hj3g</a>
+          <a href="https://nvd.nist.gov/vuln/detail/CVE-2025-65018">https://nvd.nist.gov/vuln/detail/CVE-2025-65018</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2025-65018">https://www.cve.org/CVERecord?id=CVE-2025-65018</a>
+        </td>
+      </tr>
+      <tr class="severity-HIGH">
+        <td class="pkg-name">libpng</td>
+        <td>CVE-2025-66293</td>
+        <td class="severity">HIGH</td>
+        <td class="pkg-version">1.6.47-r0</td>
+        <td>1.6.53-r0</td>
+        <td class="links" data-more-links="off">
+          <a href="http://www.openwall.com/lists/oss-security/2025/12/03/6">http://www.openwall.com/lists/oss-security/2025/12/03/6</a>
+          <a href="http://www.openwall.com/lists/oss-security/2025/12/03/7">http://www.openwall.com/lists/oss-security/2025/12/03/7</a>
+          <a href="http://www.openwall.com/lists/oss-security/2025/12/03/8">http://www.openwall.com/lists/oss-security/2025/12/03/8</a>
+          <a href="https://access.redhat.com/security/cve/CVE-2025-66293">https://access.redhat.com/security/cve/CVE-2025-66293</a>
+          <a href="https://github.com/pnggroup/libpng/commit/788a624d7387a758ffd5c7ab010f1870dea753a1">https://github.com/pnggroup/libpng/commit/788a624d7387a758ffd5c7ab010f1870dea753a1</a>
+          <a href="https://github.com/pnggroup/libpng/commit/a05a48b756de63e3234ea6b3b938b8f5f862484a">https://github.com/pnggroup/libpng/commit/a05a48b756de63e3234ea6b3b938b8f5f862484a</a>
+          <a href="https://github.com/pnggroup/libpng/issues/764">https://github.com/pnggroup/libpng/issues/764</a>
+          <a href="https://github.com/pnggroup/libpng/security/advisories/GHSA-9mpm-9pxh-mg4f">https://github.com/pnggroup/libpng/security/advisories/GHSA-9mpm-9pxh-mg4f</a>
+          <a href="https://nvd.nist.gov/vuln/detail/CVE-2025-66293">https://nvd.nist.gov/vuln/detail/CVE-2025-66293</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2025-66293">https://www.cve.org/CVERecord?id=CVE-2025-66293</a>
+        </td>
+      </tr>
+      <tr class="severity-MEDIUM">
+        <td class="pkg-name">libpng</td>
+        <td>CVE-2025-64505</td>
+        <td class="severity">MEDIUM</td>
+        <td class="pkg-version">1.6.47-r0</td>
+        <td>1.6.51-r0</td>
+        <td class="links" data-more-links="off">
+          <a href="https://access.redhat.com/security/cve/CVE-2025-64505">https://access.redhat.com/security/cve/CVE-2025-64505</a>
+          <a href="https://github.com/pnggroup/libpng/commit/6a528eb5fd0dd7f6de1c39d30de0e41473431c37">https://github.com/pnggroup/libpng/commit/6a528eb5fd0dd7f6de1c39d30de0e41473431c37</a>
+          <a href="https://github.com/pnggroup/libpng/commit/6a528eb5fd0dd7f6de1c39d30de0e41473431c37 (v1.6.51)">https://github.com/pnggroup/libpng/commit/6a528eb5fd0dd7f6de1c39d30de0e41473431c37 (v1.6.51)</a>
+          <a href="https://github.com/pnggroup/libpng/pull/748">https://github.com/pnggroup/libpng/pull/748</a>
+          <a href="https://github.com/pnggroup/libpng/security/advisories/GHSA-4952-h5wq-4m42">https://github.com/pnggroup/libpng/security/advisories/GHSA-4952-h5wq-4m42</a>
+          <a href="https://nvd.nist.gov/vuln/detail/CVE-2025-64505">https://nvd.nist.gov/vuln/detail/CVE-2025-64505</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2025-64505">https://www.cve.org/CVERecord?id=CVE-2025-64505</a>
+          <a href="https://www.openwall.com/lists/oss-security/2025/11/22/1">https://www.openwall.com/lists/oss-security/2025/11/22/1</a>
+        </td>
+      </tr>
+      <tr class="severity-MEDIUM">
+        <td class="pkg-name">libpng</td>
+        <td>CVE-2025-64506</td>
+        <td class="severity">MEDIUM</td>
+        <td class="pkg-version">1.6.47-r0</td>
+        <td>1.6.51-r0</td>
+        <td class="links" data-more-links="off">
+          <a href="https://access.redhat.com/security/cve/CVE-2025-64506">https://access.redhat.com/security/cve/CVE-2025-64506</a>
+          <a href="https://github.com/pnggroup/libpng/commit/2bd84c019c300b78e811743fbcddb67c9d9bf821">https://github.com/pnggroup/libpng/commit/2bd84c019c300b78e811743fbcddb67c9d9bf821</a>
+          <a href="https://github.com/pnggroup/libpng/pull/749">https://github.com/pnggroup/libpng/pull/749</a>
+          <a href="https://github.com/pnggroup/libpng/security/advisories/GHSA-qpr4-xm66-hww6">https://github.com/pnggroup/libpng/security/advisories/GHSA-qpr4-xm66-hww6</a>
+          <a href="https://nvd.nist.gov/vuln/detail/CVE-2025-64506">https://nvd.nist.gov/vuln/detail/CVE-2025-64506</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2025-64506">https://www.cve.org/CVERecord?id=CVE-2025-64506</a>
+        </td>
+      </tr>
+      <tr class="severity-MEDIUM">
+        <td class="pkg-name">ssl_client</td>
+        <td>CVE-2024-58251</td>
+        <td class="severity">MEDIUM</td>
+        <td class="pkg-version">1.37.0-r19</td>
+        <td>1.37.0-r20</td>
+        <td class="links" data-more-links="off">
+          <a href="http://www.openwall.com/lists/oss-security/2025/04/23/6">http://www.openwall.com/lists/oss-security/2025/04/23/6</a>
+          <a href="https://bugs.busybox.net/show_bug.cgi?id=15922">https://bugs.busybox.net/show_bug.cgi?id=15922</a>
+          <a href="https://www.busybox.net">https://www.busybox.net</a>
+          <a href="https://www.busybox.net/downloads/">https://www.busybox.net/downloads/</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2024-58251">https://www.cve.org/CVERecord?id=CVE-2024-58251</a>
+        </td>
+      </tr>
+      <tr class="severity-LOW">
+        <td class="pkg-name">ssl_client</td>
+        <td>CVE-2025-46394</td>
+        <td class="severity">LOW</td>
+        <td class="pkg-version">1.37.0-r19</td>
+        <td>1.37.0-r20</td>
+        <td class="links" data-more-links="off">
+          <a href="http://www.openwall.com/lists/oss-security/2025/04/23/5">http://www.openwall.com/lists/oss-security/2025/04/23/5</a>
+          <a href="http://www.openwall.com/lists/oss-security/2025/04/24/3">http://www.openwall.com/lists/oss-security/2025/04/24/3</a>
+          <a href="https://bugs.busybox.net/show_bug.cgi?id=16018">https://bugs.busybox.net/show_bug.cgi?id=16018</a>
+          <a href="https://lists.busybox.net/pipermail/busybox/2024-July/090806.html">https://lists.busybox.net/pipermail/busybox/2024-July/090806.html</a>
+          <a href="https://lists.busybox.net/pipermail/busybox/2024-July/090814.html">https://lists.busybox.net/pipermail/busybox/2024-July/090814.html</a>
+          <a href="https://www.busybox.net">https://www.busybox.net</a>
+          <a href="https://www.busybox.net/downloads/">https://www.busybox.net/downloads/</a>
+          <a href="https://www.cve.org/CVERecord?id=CVE-2025-46394">https://www.cve.org/CVERecord?id=CVE-2025-46394</a>
+          <a href="https://www.openwall.com/lists/oss-security/2025/04/23/1">https://www.openwall.com/lists/oss-security/2025/04/23/1</a>
+        </td>
+      </tr>
+      <tr><th colspan="6">No Misconfigurations found</th></tr>
+    </table>
+  </body>
+</html>
